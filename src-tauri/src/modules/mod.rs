@@ -12,6 +12,7 @@ pub mod integration;
 pub mod log_bridge;
 pub mod logger;
 pub mod migration;
+pub mod native_token_stats;
 pub mod oauth;
 pub mod oauth_server;
 pub mod process;

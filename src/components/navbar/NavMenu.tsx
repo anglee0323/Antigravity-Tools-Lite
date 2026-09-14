@@ -1,7 +1,6 @@
 import { Link, useLocation } from 'react-router-dom';
 import { NavigationDropdown } from './NavDropdowns';
 import { isActive, getCurrentNavItem, type NavItem } from './constants';
-import { useConfigStore } from '../../stores/useConfigStore';
 
 interface NavMenuProps {
     navItems: NavItem[];
@@ -19,10 +18,8 @@ interface NavMenuProps {
  */
 export function NavMenu({ navItems }: NavMenuProps) {
     const location = useLocation();
-    const { isMenuItemHidden } = useConfigStore();
-
-    // 过滤隐藏的菜单项
-    const visibleNavItems = navItems.filter(item => !isMenuItemHidden(item.path));
+    // 定制版只保留固定的三项主导航，旧配置中的隐藏项不再影响核心入口。
+    const visibleNavItems = navItems;
 
     return (
         <>

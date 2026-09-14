@@ -685,6 +685,7 @@ pub fn run() {
             commands::get_token_stats_model_trend_daily,
             commands::get_token_stats_account_trend_hourly,
             commands::get_token_stats_account_trend_daily,
+            commands::get_local_token_usage,
             proxy::cli_sync::get_cli_sync_status,
             proxy::cli_sync::execute_cli_sync,
             proxy::cli_sync::execute_cli_restore,

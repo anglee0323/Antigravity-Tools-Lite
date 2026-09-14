@@ -1216,6 +1216,15 @@ pub async fn get_token_stats_account_trend_daily(
     crate::modules::token_stats::get_account_trend_daily(days)
 }
 
+/// 读取 Antigravity 原生对话数据库中的本地 Token 用量
+#[tauri::command]
+pub async fn get_local_token_usage(
+) -> Result<crate::modules::native_token_stats::LocalTokenUsageSummary, String> {
+    tokio::task::spawn_blocking(crate::modules::native_token_stats::get_local_token_usage)
+        .await
+        .map_err(|error| format!("读取本地 Token 统计任务失败: {}", error))?
+}
+
 #[tauri::command]
 pub async fn query_transit_info(url: String, key: String) -> Result<String, String> {
     let client = reqwest::Client::builder()

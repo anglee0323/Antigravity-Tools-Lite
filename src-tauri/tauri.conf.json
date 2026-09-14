@@ -1,8 +1,8 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "Antigravity Tools",
+  "productName": "Antigravity Tools Lite",
   "version": "4.7.1",
-  "identifier": "com.lbjlaq.antigravity-tools",
+  "identifier": "com.lbjlaq.antigravity-tools-lite",
   "build": {
     "beforeDevCommand": "npm run dev",
     "devUrl": "http://localhost:1420",

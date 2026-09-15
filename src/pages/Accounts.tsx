@@ -20,6 +20,7 @@ import { useAccountStore } from "../stores/useAccountStore";
 import { useConfigStore } from "../stores/useConfigStore";
 import { cn } from "../utils/cn";
 import { useTranslation } from "react-i18next";
+import type { Account } from "../types/account";
 
 type FilterType = "all" | "pro" | "ultra" | "free";
 type ViewMode = "list" | "grid";
@@ -66,6 +67,7 @@ function Accounts() {
   }, [quotaWindow]);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [isBatchDelete, setIsBatchDelete] = useState(false);
+  const [accountToDelete, setAccountToDelete] = useState<Account | null>(null);
   const [refreshingIds, setRefreshingIds] = useState<Set<string>>(new Set());
   const containerRef = useRef<HTMLDivElement>(null);
   const [containerSize, setContainerSize] = useState({ width: 0, height: 0 });
@@ -288,6 +290,29 @@ function Accounts() {
   const handleBatchDelete = () => {
     if (selectedIds.size === 0) return;
     setIsBatchDelete(true);
+  };
+
+  const handleDelete = (accountId: string) => {
+    const account = accounts.find((item) => item.id === accountId);
+    if (account) setAccountToDelete(account);
+  };
+
+  const executeDelete = async () => {
+    if (!accountToDelete) return;
+    const accountId = accountToDelete.id;
+    setAccountToDelete(null);
+    try {
+      await deleteAccounts([accountId]);
+      setSelectedIds((prev) => {
+        const next = new Set(prev);
+        next.delete(accountId);
+        return next;
+      });
+      showToast(t("common.success"), "success");
+    } catch (error) {
+      console.error("[Accounts] Delete failed:", error);
+      showToast(`${t("common.error")}: ${error}`, "error");
+    }
   };
 
   const executeBatchDelete = async () => {
@@ -634,6 +659,7 @@ function Accounts() {
                 switchingAccountId={switchingAccountId}
                 onSwitch={handleSwitch}
                 onRefresh={handleRefresh}
+                onDelete={handleDelete}
                 onReorder={reorderAccounts}
                 quotaWindow={quotaWindow}
               />
@@ -650,6 +676,7 @@ function Accounts() {
               switchingAccountId={switchingAccountId}
               onSwitch={handleSwitch}
               onRefresh={handleRefresh}
+              onDelete={handleDelete}
               quotaWindow={quotaWindow}
             />
           </div>
@@ -683,6 +710,19 @@ function Accounts() {
         isDestructive={true}
         onConfirm={executeBatchDelete}
         onCancel={() => setIsBatchDelete(false)}
+      />
+
+      <ModalDialog
+        isOpen={accountToDelete !== null}
+        title={t("accounts.dialog.delete_title")}
+        message={accountToDelete
+          ? `${t("accounts.dialog.delete_msg")}\n\n${accountToDelete.email}`
+          : undefined}
+        type="confirm"
+        confirmText={t("common.delete")}
+        isDestructive={true}
+        onConfirm={executeDelete}
+        onCancel={() => setAccountToDelete(null)}
       />
 
       <ModalDialog

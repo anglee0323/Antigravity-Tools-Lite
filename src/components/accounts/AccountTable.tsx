@@ -26,6 +26,7 @@ import {
     GripVertical,
     ArrowRightLeft,
     RefreshCw,
+    Trash2,
     Lock,
     Ban,
     Diamond,
@@ -64,6 +65,7 @@ interface AccountTableProps {
     switchingAccountId: string | null;
     onSwitch: (accountId: string, targetIde?: string) => void;
     onRefresh: (accountId: string) => void;
+    onDelete: (accountId: string) => void;
     /** 拖拽排序回调，当用户完成拖拽时触发 */
     onReorder?: (accountIds: string[]) => void;
     quotaWindow?: '5h' | 'weekly';
@@ -79,6 +81,7 @@ interface SortableRowProps {
     onSelect: () => void;
     onSwitch: (targetIde?: string) => void;
     onRefresh: () => void;
+    onDelete: () => void;
     quotaWindow?: '5h' | 'weekly';
     isDragDisabled?: boolean;
 }
@@ -91,6 +94,7 @@ interface AccountRowContentProps {
     isDisabled: boolean;
     onSwitch: (targetIde?: string) => void;
     onRefresh: () => void;
+    onDelete: () => void;
     quotaWindow?: '5h' | 'weekly';
 }
 
@@ -178,6 +182,7 @@ function SortableAccountRow({
     onSelect,
     onSwitch,
     onRefresh,
+    onDelete,
     quotaWindow,
     isDragDisabled = false,
 }: SortableRowProps) {
@@ -243,6 +248,7 @@ function SortableAccountRow({
                 isDisabled={Boolean(account.disabled)}
                 onSwitch={onSwitch}
                 onRefresh={onRefresh}
+                onDelete={onDelete}
                 quotaWindow={quotaWindow}
             />
         </tr>
@@ -261,6 +267,7 @@ function AccountRowContent({
     isDisabled,
     onSwitch,
     onRefresh,
+    onDelete,
     quotaWindow,
 }: AccountRowContentProps) {
     const { t } = useTranslation();
@@ -524,6 +531,15 @@ function AccountRowContent({
                     >
                         <RefreshCw className={`w-3.5 h-3.5 ${isRefreshing ? 'animate-spin' : ''}`} />
                     </button>
+                    <button
+                        className="p-1.5 text-gray-500 dark:text-gray-400 rounded-lg transition-all hover:text-red-600 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/30 disabled:cursor-not-allowed disabled:opacity-50"
+                        onClick={(e) => { e.stopPropagation(); onDelete(); }}
+                        title={t('common.delete')}
+                        aria-label={`${t('common.delete')} ${account.email}`}
+                        disabled={isRefreshing || isSwitching}
+                    >
+                        <Trash2 className="w-3.5 h-3.5" />
+                    </button>
                 </div>
             </td>
         </>
@@ -548,6 +564,7 @@ function AccountTable({
     switchingAccountId,
     onSwitch,
     onRefresh,
+    onDelete,
     onReorder,
     quotaWindow,
 }: AccountTableProps) {
@@ -724,6 +741,7 @@ function AccountTable({
                                     onSelect={() => onToggleSelect(account.id)}
                                     onSwitch={(targetIde?: string) => onSwitch(account.id, targetIde)}
                                     onRefresh={() => onRefresh(account.id)}
+                                    onDelete={() => onDelete(account.id)}
                                     quotaWindow={quotaWindow}
                                     isDragDisabled={isSortingActive}
                                 />
@@ -760,6 +778,7 @@ function AccountTable({
                                         isSwitching={activeAccount.id === switchingAccountId}
                                         onSwitch={() => { }}
                                         onRefresh={() => { }}
+                                        onDelete={() => { }}
                                         isDisabled={Boolean(activeAccount.disabled)}
                                         quotaWindow={quotaWindow}
                                     />

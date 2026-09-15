@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import { ArrowRightLeft, RefreshCw, Lock, Ban, Diamond, Gem, Circle, Sparkles, Tag, Clock, Bot } from 'lucide-react';
+import { ArrowRightLeft, RefreshCw, Trash2, Lock, Ban, Diamond, Gem, Circle, Sparkles, Tag, Clock, Bot } from 'lucide-react';
 import { Account, ModelQuota } from '../../types/account';
 import { cn } from '../../utils/cn';
 import { useTranslation } from 'react-i18next';
@@ -18,6 +18,7 @@ interface AccountCardProps {
     isSwitching?: boolean;
     onSwitch: (targetIde?: string) => void;
     onRefresh: () => void;
+    onDelete: () => void;
     quotaWindow?: '5h' | 'weekly';
 }
 
@@ -29,7 +30,7 @@ const DEFAULT_MODELS = Object.entries(MODEL_CONFIG).map(([id, config]) => ({
     Icon: config.Icon
 }));
 
-function AccountCard({ account, selected, onSelect, isCurrent: propIsCurrent, isRefreshing, isSwitching = false, onSwitch, onRefresh, quotaWindow }: AccountCardProps) {
+function AccountCard({ account, selected, onSelect, isCurrent: propIsCurrent, isRefreshing, isSwitching = false, onSwitch, onRefresh, onDelete, quotaWindow }: AccountCardProps) {
     const { t } = useTranslation();
     const { config, showAllQuotas } = useConfigStore();
     const isDisabled = Boolean(account.disabled);
@@ -283,6 +284,15 @@ function AccountCard({ account, selected, onSelect, isCurrent: propIsCurrent, is
                         title={isDisabled ? t('accounts.disabled_tooltip') : t('common.refresh')}
                     >
                         <RefreshCw className={`w-3.5 h-3.5 ${isRefreshing ? 'animate-spin' : ''}`} />
+                    </button>
+                    <button
+                        className="p-1.5 rounded-lg transition-all text-gray-400 hover:text-red-600 hover:bg-red-50 dark:hover:text-red-400 dark:hover:bg-red-900/30"
+                        onClick={(e) => { e.stopPropagation(); onDelete(); }}
+                        disabled={isRefreshing || isSwitching}
+                        title={t('common.delete')}
+                        aria-label={`${t('common.delete')} ${account.email}`}
+                    >
+                        <Trash2 className="w-3.5 h-3.5" />
                     </button>
                 </div>
             </div>

@@ -26,25 +26,15 @@ import {
     GripVertical,
     ArrowRightLeft,
     RefreshCw,
-    Trash2,
-    Download,
-    Fingerprint,
-    Info,
     Lock,
     Ban,
     Diamond,
     Gem,
     Circle,
-    ToggleLeft,
-    ToggleRight,
     Sparkles,
     Tag,
-    X,
-    Check,
     Clock,
     Bot,
-    Repeat2,
-    Terminal,
     ArrowUpDown,
     ArrowUp,
     ArrowDown,
@@ -74,16 +64,8 @@ interface AccountTableProps {
     switchingAccountId: string | null;
     onSwitch: (accountId: string, targetIde?: string) => void;
     onRefresh: (accountId: string) => void;
-    onViewDevice: (accountId: string) => void;
-    onViewDetails: (accountId: string) => void;
-    onExport: (accountId: string) => void;
-    onDelete: (accountId: string) => void;
-    onToggleProxy: (accountId: string) => void;
-    onWarmup?: (accountId: string) => void;
-    onUpdateLabel?: (accountId: string, label: string) => void;
     /** 拖拽排序回调，当用户完成拖拽时触发 */
     onReorder?: (accountIds: string[]) => void;
-    onViewError: (accountId: string) => void;
     quotaWindow?: '5h' | 'weekly';
 }
 
@@ -97,14 +79,6 @@ interface SortableRowProps {
     onSelect: () => void;
     onSwitch: (targetIde?: string) => void;
     onRefresh: () => void;
-    onViewDevice: () => void;
-    onViewDetails: () => void;
-    onExport: () => void;
-    onDelete: () => void;
-    onToggleProxy: () => void;
-    onWarmup?: () => void;
-    onUpdateLabel?: (label: string) => void;
-    onViewError: () => void;
     quotaWindow?: '5h' | 'weekly';
     isDragDisabled?: boolean;
 }
@@ -117,14 +91,6 @@ interface AccountRowContentProps {
     isDisabled: boolean;
     onSwitch: (targetIde?: string) => void;
     onRefresh: () => void;
-    onViewDevice: () => void;
-    onViewDetails: () => void;
-    onExport: () => void;
-    onDelete: () => void;
-    onToggleProxy: () => void;
-    onWarmup?: () => void;
-    onUpdateLabel?: (label: string) => void;
-    onViewError: () => void;
     quotaWindow?: '5h' | 'weekly';
 }
 
@@ -212,14 +178,6 @@ function SortableAccountRow({
     onSelect,
     onSwitch,
     onRefresh,
-    onViewDevice,
-    onViewDetails,
-    onExport,
-    onDelete,
-    onToggleProxy,
-    onWarmup,
-    onUpdateLabel,
-    onViewError,
     quotaWindow,
     isDragDisabled = false,
 }: SortableRowProps) {
@@ -285,14 +243,6 @@ function SortableAccountRow({
                 isDisabled={Boolean(account.disabled)}
                 onSwitch={onSwitch}
                 onRefresh={onRefresh}
-                onViewDevice={onViewDevice}
-                onViewDetails={onViewDetails}
-                onExport={onExport}
-                onDelete={onDelete}
-                onToggleProxy={onToggleProxy}
-                onWarmup={onWarmup}
-                onUpdateLabel={onUpdateLabel}
-                onViewError={onViewError}
                 quotaWindow={quotaWindow}
             />
         </tr>
@@ -311,43 +261,11 @@ function AccountRowContent({
     isDisabled,
     onSwitch,
     onRefresh,
-    onViewDevice,
-    onViewDetails,
-    onExport,
-    onDelete,
-    onToggleProxy,
-    onWarmup,
-    onUpdateLabel,
-    onViewError,
     quotaWindow,
 }: AccountRowContentProps) {
     const { t } = useTranslation();
     const { config, showAllQuotas } = useConfigStore();
     const validationBlockedLabel = getValidationBlockedStatusLabel(account.validation_blocked_reason, t);
-
-    // 自定义标签编辑状态
-    const [isEditingLabel, setIsEditingLabel] = useState(false);
-    const [labelInput, setLabelInput] = useState(account.custom_label || '');
-
-    const handleSaveLabel = () => {
-        if (onUpdateLabel) {
-            onUpdateLabel(labelInput.trim());
-        }
-        setIsEditingLabel(false);
-    };
-
-    const handleCancelLabel = () => {
-        setLabelInput(account.custom_label || '');
-        setIsEditingLabel(false);
-    };
-
-    const handleKeyDown = (e: React.KeyboardEvent) => {
-        if (e.key === 'Enter') {
-            handleSaveLabel();
-        } else if (e.key === 'Escape') {
-            handleCancelLabel();
-        }
-    };
 
     // 解析周配额项 (当处于 weekly 视图时)
     const weeklyItems = useMemo(() => {
@@ -458,15 +376,6 @@ function AccountRowContent({
                             </span>
                         )}
 
-                        {account.proxy_disabled && (
-                            <span
-                                className="px-2 py-0.5 rounded-md bg-orange-100 dark:bg-orange-900/50 text-orange-700 dark:text-orange-300 text-[10px] font-bold flex items-center gap-1 shadow-sm border border-orange-200/50"
-                            >
-                                <Ban className="w-2.5 h-2.5" />
-                                <span>{t('accounts.proxy_disabled')}</span>
-                            </span>
-                        )}
-
                         {account.quota?.is_forbidden && (
                             <span className="px-2 py-0.5 rounded-md bg-red-100 dark:bg-red-900/50 text-red-600 dark:text-red-400 text-[10px] font-bold flex items-center gap-1 shadow-sm border border-red-200/50">
                                 <Lock className="w-2.5 h-2.5" />
@@ -508,39 +417,11 @@ function AccountRowContent({
                             }
                         })()}
                         {/* 自定义标签 */}
-                        {account.custom_label && !isEditingLabel && (
+                        {account.custom_label && (
                             <span className="flex items-center gap-1 px-2 py-0.5 rounded-md bg-orange-100 dark:bg-orange-900/40 text-orange-700 dark:text-orange-300 text-[10px] font-bold shadow-sm border border-orange-200/50 dark:border-orange-800/50">
                                 <Tag className="w-2.5 h-2.5" />
                                 {account.custom_label}
                             </span>
-                        )}
-                        {/* 标签编辑输入框 */}
-                        {isEditingLabel && (
-                            <div className="flex items-center gap-1">
-                                <input
-                                    type="text"
-                                    className="px-1.5 py-0.5 text-[10px] w-20 border border-orange-300 dark:border-orange-700 rounded focus:outline-none focus:ring-1 focus:ring-orange-500 bg-white dark:bg-base-200"
-                                    placeholder={t('accounts.custom_label_placeholder', 'Label')}
-                                    value={labelInput}
-                                    onChange={(e) => setLabelInput(e.target.value)}
-                                    onKeyDown={handleKeyDown}
-                                    autoFocus
-                                    maxLength={15}
-                                    onClick={(e) => e.stopPropagation()}
-                                />
-                                <button
-                                    className="p-0.5 text-green-600 hover:bg-green-50 dark:hover:bg-green-900/30 rounded transition-all"
-                                    onClick={(e) => { e.stopPropagation(); handleSaveLabel(); }}
-                                >
-                                    <Check className="w-3 h-3" />
-                                </button>
-                                <button
-                                    className="p-0.5 text-gray-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/30 rounded transition-all"
-                                    onClick={(e) => { e.stopPropagation(); handleCancelLabel(); }}
-                                >
-                                    <X className="w-3 h-3" />
-                                </button>
-                            </div>
                         )}
                     </div>
 
@@ -566,16 +447,6 @@ function AccountRowContent({
                                 {account.validation_blocked ? validationBlockedLabel : (isDisabled ? t('accounts.status.disabled') : t('accounts.forbidden_msg'))}
                             </span>
                         </div>
-                        <div className={cn(
-                            "w-px h-3",
-                            account.validation_blocked ? "bg-amber-200 dark:bg-amber-800/50" : "bg-red-200 dark:bg-red-800/50"
-                        )} />
-                        <button
-                            onClick={(e) => { e.stopPropagation(); onViewError(); }}
-                            className="text-[10px] font-medium text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-0.5"
-                        >
-                            {t('accounts.view_error')}
-                        </button>
                     </div>
                 ) : (
                     <div className={cn(
@@ -636,36 +507,7 @@ function AccountRowContent({
                     : "bg-white dark:bg-base-100",
                 !isCurrent && "group-hover:bg-gray-50 dark:group-hover:bg-base-200"
             )}>
-                <div className="flex flex-wrap items-center justify-center gap-1 opacity-60 group-hover:opacity-100 transition-opacity max-w-[220px] mx-auto">
-                    <button
-                        className="p-1.5 text-gray-500 dark:text-gray-400 hover:text-sky-600 dark:hover:text-sky-400 hover:bg-sky-50 dark:hover:bg-sky-900/30 rounded-lg transition-all"
-                        onClick={(e) => { e.stopPropagation(); onViewDetails(); }}
-                        title={t('common.details')}
-                    >
-                        <Info className="w-3.5 h-3.5" />
-                    </button>
-                    <button
-                        className="p-1.5 text-gray-500 dark:text-gray-400 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 rounded-lg transition-all"
-                        onClick={(e) => { e.stopPropagation(); onViewDevice(); }}
-                        title={t('accounts.device_fingerprint')}
-                    >
-                        <Fingerprint className="w-3.5 h-3.5" />
-                    </button>
-                    {/* 自定义标签按钮 */}
-                    {onUpdateLabel && (
-                        <button
-                            className={cn(
-                                "p-1.5 rounded-lg transition-all",
-                                account.custom_label
-                                    ? "text-orange-500 hover:text-orange-600 hover:bg-orange-50 dark:hover:bg-orange-900/30"
-                                    : "text-gray-500 dark:text-gray-400 hover:text-orange-500 hover:bg-orange-50 dark:hover:bg-orange-900/30"
-                            )}
-                            onClick={(e) => { e.stopPropagation(); setIsEditingLabel(true); }}
-                            title={t('accounts.edit_label', 'Edit Label')}
-                        >
-                            <Tag className="w-3.5 h-3.5" />
-                        </button>
-                    )}
+                <div className="flex items-center justify-center gap-1 opacity-60 group-hover:opacity-100 transition-opacity max-w-[90px] mx-auto">
                     <button
                         className={`p-1.5 text-gray-500 dark:text-gray-400 rounded-lg transition-all ${(isSwitching || isDisabled) ? 'bg-blue-50 dark:bg-blue-900/10 text-blue-600 dark:text-blue-400 cursor-not-allowed' : 'hover:text-blue-600 dark:hover:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/30'}`}
                         onClick={(e) => { e.stopPropagation(); onSwitch(); }}
@@ -675,68 +517,12 @@ function AccountRowContent({
                         <ArrowRightLeft className={`w-3.5 h-3.5 ${isSwitching ? 'animate-spin' : ''}`} />
                     </button>
                     <button
-                        className={`p-1.5 text-gray-500 dark:text-gray-400 rounded-lg transition-all ${(isSwitching || isDisabled) ? 'bg-blue-50 dark:bg-blue-900/10 text-blue-600 dark:text-blue-400 cursor-not-allowed' : 'hover:text-sky-600 dark:hover:text-sky-400 hover:bg-sky-50 dark:hover:bg-sky-900/30'}`}
-                        onClick={(e) => { e.stopPropagation(); onSwitch('ide'); }}
-                        title={isDisabled ? t('accounts.disabled_tooltip') : (isSwitching ? t('common.loading') : t('accounts.switch_to_ide', '切换到 Antigravity IDE'))}
-                        disabled={isSwitching || isDisabled}
-                    >
-                        <Repeat2 className={`w-3.5 h-3.5 ${isSwitching ? 'animate-spin' : ''}`} />
-                    </button>
-                    <button
-                        className={`p-1.5 text-gray-500 dark:text-gray-400 rounded-lg transition-all ${(isSwitching || isDisabled) ? 'bg-blue-50 dark:bg-blue-900/10 text-blue-600 dark:text-blue-400 cursor-not-allowed' : 'hover:text-emerald-600 dark:hover:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-900/30'}`}
-                        onClick={(e) => { e.stopPropagation(); onSwitch('agy'); }}
-                        title={isDisabled ? t('accounts.disabled_tooltip') : (isSwitching ? t('common.loading') : t('accounts.switch_to_agy', '切换到 Antigravity CLI (agy)'))}
-                        disabled={isSwitching || isDisabled}
-                    >
-                        <Terminal className={`w-3.5 h-3.5 ${isSwitching ? 'animate-spin' : ''}`} />
-                    </button>
-                    {onWarmup && (
-                        <button
-                            className={`p-1.5 text-gray-500 dark:text-gray-400 rounded-lg transition-all ${(isRefreshing || isDisabled) ? 'bg-orange-50 dark:bg-orange-900/10 text-orange-600 dark:text-orange-400 cursor-not-allowed' : 'hover:text-orange-500 dark:hover:text-orange-400 hover:bg-orange-50 dark:hover:bg-orange-900/30'}`}
-                            onClick={(e) => { e.stopPropagation(); onWarmup(); }}
-                            title={isDisabled ? t('accounts.disabled_tooltip') : (isRefreshing ? t('common.loading') : t('accounts.warmup_this', '预热该账号'))}
-                            disabled={isRefreshing || isDisabled}
-                        >
-                            <Sparkles className={`w-3.5 h-3.5 ${isRefreshing ? 'animate-pulse' : ''}`} />
-                        </button>
-                    )}
-                    <button
                         className={`p-1.5 text-gray-500 dark:text-gray-400 rounded-lg transition-all ${(isRefreshing || isDisabled) ? 'bg-green-50 dark:bg-green-900/10 text-green-600 dark:text-green-400 cursor-not-allowed' : 'hover:text-green-600 dark:hover:text-green-400 hover:bg-green-50 dark:hover:bg-green-900/30'}`}
                         onClick={(e) => { e.stopPropagation(); onRefresh(); }}
                         title={isDisabled ? t('accounts.disabled_tooltip') : (isRefreshing ? t('common.refreshing') : t('common.refresh'))}
                         disabled={isRefreshing || isDisabled}
                     >
                         <RefreshCw className={`w-3.5 h-3.5 ${isRefreshing ? 'animate-spin' : ''}`} />
-                    </button>
-                    <button
-                        className="p-1.5 text-gray-500 dark:text-gray-400 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 rounded-lg transition-all"
-                        onClick={(e) => { e.stopPropagation(); onExport(); }}
-                        title={t('common.export')}
-                    >
-                        <Download className="w-3.5 h-3.5" />
-                    </button>
-                    <button
-                        className={cn(
-                            "p-1.5 rounded-lg transition-all",
-                            account.proxy_disabled
-                                ? "text-gray-500 dark:text-gray-400 hover:text-green-600 dark:hover:text-green-400 hover:bg-green-50 dark:hover:bg-green-900/30"
-                                : "text-gray-500 dark:text-gray-400 hover:text-orange-600 dark:hover:text-orange-400 hover:bg-orange-50 dark:hover:bg-orange-900/30"
-                        )}
-                        onClick={(e) => { e.stopPropagation(); onToggleProxy(); }}
-                        title={account.proxy_disabled ? t('accounts.enable_proxy') : t('accounts.disable_proxy')}
-                    >
-                        {account.proxy_disabled ? (
-                            <ToggleRight className="w-3.5 h-3.5" />
-                        ) : (
-                            <ToggleLeft className="w-3.5 h-3.5" />
-                        )}
-                    </button>
-                    <button
-                        className="p-1.5 text-gray-500 dark:text-gray-400 hover:text-red-600 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/30 rounded-lg transition-all"
-                        onClick={(e) => { e.stopPropagation(); onDelete(); }}
-                        title={t('common.delete')}
-                    >
-                        <Trash2 className="w-3.5 h-3.5" />
                     </button>
                 </div>
             </td>
@@ -762,15 +548,7 @@ function AccountTable({
     switchingAccountId,
     onSwitch,
     onRefresh,
-    onViewDevice,
-    onViewDetails,
-    onExport,
-    onDelete,
-    onToggleProxy,
     onReorder,
-    onWarmup,
-    onUpdateLabel,
-    onViewError,
     quotaWindow,
 }: AccountTableProps) {
     const { t } = useTranslation();
@@ -929,7 +707,7 @@ function AccountTable({
                                     )}
                                 </button>
                             </th>
-                            <th className="px-2 py-1 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider whitespace-nowrap sticky right-0 w-[220px] bg-gray-50 dark:bg-base-200 z-20 shadow-[-12px_0_12px_-12px_rgba(0,0,0,0.1)] dark:shadow-[-12px_0_12px_-12px_rgba(255,255,255,0.05)] text-center">{t('accounts.table.actions')}</th>
+                            <th className="px-2 py-1 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider whitespace-nowrap sticky right-0 w-[90px] bg-gray-50 dark:bg-base-200 z-20 shadow-[-12px_0_12px_-12px_rgba(0,0,0,0.1)] dark:shadow-[-12px_0_12px_-12px_rgba(255,255,255,0.05)] text-center">{t('accounts.table.actions')}</th>
                         </tr >
                     </thead >
                     <SortableContext items={accountIds} strategy={verticalListSortingStrategy}>
@@ -946,14 +724,6 @@ function AccountTable({
                                     onSelect={() => onToggleSelect(account.id)}
                                     onSwitch={(targetIde?: string) => onSwitch(account.id, targetIde)}
                                     onRefresh={() => onRefresh(account.id)}
-                                    onViewDevice={() => onViewDevice(account.id)}
-                                    onViewDetails={() => onViewDetails(account.id)}
-                                    onExport={() => onExport(account.id)}
-                                    onDelete={() => onDelete(account.id)}
-                                    onToggleProxy={() => onToggleProxy(account.id)}
-                                    onWarmup={onWarmup ? () => onWarmup(account.id) : undefined}
-                                    onUpdateLabel={onUpdateLabel ? (label: string) => onUpdateLabel(account.id, label) : undefined}
-                                    onViewError={() => onViewError(account.id)}
                                     quotaWindow={quotaWindow}
                                     isDragDisabled={isSortingActive}
                                 />
@@ -990,13 +760,7 @@ function AccountTable({
                                         isSwitching={activeAccount.id === switchingAccountId}
                                         onSwitch={() => { }}
                                         onRefresh={() => { }}
-                                        onViewDevice={() => { }}
-                                        onViewDetails={() => { }}
-                                        onExport={() => { }}
-                                        onDelete={() => { }}
-                                        onToggleProxy={() => { }}
                                         isDisabled={Boolean(activeAccount.disabled)}
-                                        onViewError={() => { }}
                                         quotaWindow={quotaWindow}
                                     />
                                 </tr>

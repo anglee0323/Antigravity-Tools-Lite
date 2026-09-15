@@ -30,6 +30,16 @@ pub struct LocalTokenDaily {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct LocalTokenHourly {
+    pub hour: String,
+    pub input_tokens: u64,
+    pub output_tokens: u64,
+    pub cached_tokens: u64,
+    pub total_tokens: u64,
+    pub request_count: u64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct LocalTokenModel {
     pub model: String,
     pub input_tokens: u64,
@@ -45,6 +55,7 @@ pub struct LocalTokenUsageSummary {
     pub last_7_days: LocalTokenTotals,
     pub last_30_days: LocalTokenTotals,
     pub daily: Vec<LocalTokenDaily>,
+    pub hourly: Vec<LocalTokenHourly>,
     /// Model totals for today. `by_model` remains the 30-day view for compatibility.
     pub by_model_today: Vec<LocalTokenModel>,
     /// Model totals for the last 7 days.
@@ -111,6 +122,7 @@ pub fn get_local_token_usage() -> Result<LocalTokenUsageSummary, String> {
     let mut last_7_days_totals = LocalTokenTotals::default();
     let mut last_30_days_totals = LocalTokenTotals::default();
     let mut daily: BTreeMap<NaiveDate, LocalTokenTotals> = BTreeMap::new();
+    let mut hourly: BTreeMap<String, LocalTokenTotals> = BTreeMap::new();
     let mut by_model_today: BTreeMap<String, LocalTokenTotals> = BTreeMap::new();
     let mut by_model_7_days: BTreeMap<String, LocalTokenTotals> = BTreeMap::new();
     let mut by_model_30_days: BTreeMap<String, LocalTokenTotals> = BTreeMap::new();
@@ -121,9 +133,11 @@ pub fn get_local_token_usage() -> Result<LocalTokenUsageSummary, String> {
             continue;
         };
         let date = date_time.date_naive();
+        let hour = date_time.format("%Y-%m-%d %H:00").to_string();
 
         add_event(&mut last_30_days_totals, &event);
         add_event(daily.entry(date).or_default(), &event);
+        add_event(hourly.entry(hour).or_default(), &event);
         add_event(
             by_model_30_days.entry(event.model.clone()).or_default(),
             &event,
@@ -162,11 +176,24 @@ pub fn get_local_token_usage() -> Result<LocalTokenUsageSummary, String> {
         })
         .collect();
 
+    let hourly = hourly
+        .into_iter()
+        .map(|(hour, totals)| LocalTokenHourly {
+            hour,
+            input_tokens: totals.input_tokens,
+            output_tokens: totals.output_tokens,
+            cached_tokens: totals.cached_tokens,
+            total_tokens: totals.total_tokens,
+            request_count: totals.request_count,
+        })
+        .collect();
+
     Ok(LocalTokenUsageSummary {
         today: today_totals,
         last_7_days: last_7_days_totals,
         last_30_days: last_30_days_totals,
         daily,
+        hourly,
         by_model_today: model_totals(by_model_today),
         by_model_7_days: model_totals(by_model_7_days),
         by_model: model_totals(by_model_30_days),

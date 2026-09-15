@@ -276,20 +276,22 @@ function Dashboard() {
                                 </h2>
                                 <p className="mt-0.5 text-[11px] text-gray-400 dark:text-gray-500">按本地生成记录统计</p>
                             </div>
-                            <div className="min-w-[132px] text-right" aria-live="polite">
+                            <div className="pointer-events-none h-11 w-[230px] shrink-0 overflow-hidden text-right" aria-live="polite">
                                 {hoveredPoint ? (
-                                    <>
-                                        <div className="text-[10px] font-medium text-blue-600 dark:text-blue-400">{hoveredPoint.label}</div>
-                                        <div className="text-sm font-bold text-gray-900 dark:text-base-content">{formatTokens(hoveredPoint.total_tokens)} Token</div>
-                                        <div className="text-[10px] text-gray-400 dark:text-gray-500">
+                                    <div className="flex h-full flex-col justify-center">
+                                        <div className="text-[10px] font-medium leading-3 text-blue-600 dark:text-blue-400">{hoveredPoint.label}</div>
+                                        <div className="whitespace-nowrap text-sm font-bold leading-4 text-gray-900 dark:text-base-content">{formatTokens(hoveredPoint.total_tokens)} Token</div>
+                                        <div className="whitespace-nowrap text-[10px] leading-3 text-gray-400 dark:text-gray-500">
                                             输入 {compactTokens(hoveredPoint.input_tokens)} · 输出 {compactTokens(hoveredPoint.output_tokens)}
                                         </div>
-                                        <div className="text-[10px] text-gray-400 dark:text-gray-500">
+                                        <div className="whitespace-nowrap text-[10px] leading-3 text-gray-400 dark:text-gray-500">
                                             缓存 {compactTokens(hoveredPoint.cached_tokens)} · {formatTokens(hoveredPoint.request_count)} 次请求
                                         </div>
-                                    </>
+                                    </div>
                                 ) : (
-                                    <span className="text-[11px] text-gray-400 dark:text-gray-500">悬浮柱子查看用量</span>
+                                    <div className="flex h-full items-center justify-end text-[11px] text-gray-400 dark:text-gray-500">
+                                        悬浮柱子查看用量
+                                    </div>
                                 )}
                             </div>
                         </div>
@@ -308,7 +310,7 @@ function Dashboard() {
                                     >
                                         <div className="relative flex w-full flex-1 items-end justify-center">
                                             <div
-                                                className={`w-full rounded-t-lg bg-gradient-to-t from-blue-500 to-cyan-400 transition-all group-hover:from-blue-600 group-hover:to-cyan-500 ${range === 'today' || range === '30d' ? 'max-w-4' : 'max-w-10'} ${hoveredPoint?.key === point.key ? 'ring-2 ring-blue-200 dark:ring-blue-700' : ''}`}
+                                                className={`w-full rounded-t-lg bg-gradient-to-t from-blue-500 to-cyan-400 transition-colors group-hover:from-blue-600 group-hover:to-cyan-500 ${range === 'today' || range === '30d' ? 'max-w-4' : 'max-w-10'} ${hoveredPoint?.key === point.key ? 'ring-2 ring-blue-200 dark:ring-blue-700' : ''}`}
                                                 style={{ height: `${height}%` }}
                                                 title={`${point.label}: ${formatTokens(point.total_tokens)} Token · 输入 ${formatTokens(point.input_tokens)} · 输出 ${formatTokens(point.output_tokens)} · 缓存 ${formatTokens(point.cached_tokens)} · ${formatTokens(point.request_count)} 次请求`}
                                             />

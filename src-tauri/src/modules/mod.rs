@@ -1,5 +1,6 @@
 pub mod account;
 pub mod account_service;
+pub mod api_pricing;
 pub mod cache;
 pub mod cloudflared;
 pub mod config;

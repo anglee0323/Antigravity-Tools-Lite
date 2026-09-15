@@ -249,21 +249,6 @@ pub fn run() {
     #[cfg(target_os = "linux")]
     configure_linux_graphics();
 
-    // Initialize token stats database
-    if let Err(e) = modules::token_stats::init_db() {
-        error!("Failed to initialize token stats database: {}", e);
-    }
-
-    // Initialize security database
-    if let Err(e) = modules::security_db::init_db() {
-        error!("Failed to initialize security database: {}", e);
-    }
-
-    // Initialize user token database
-    if let Err(e) = modules::user_token_db::init_db() {
-        error!("Failed to initialize user token database: {}", e);
-    }
-
     if is_headless {
         info!("Starting in HEADLESS mode...");
 
@@ -485,64 +470,9 @@ pub fn run() {
                 info!("Tray disabled for this session");
             }
 
-            // 立即启动管理服务器 (8045)，以便 Web 端能访问
-            let handle = app.handle().clone();
-            tauri::async_runtime::spawn(async move {
-                // Load config
-                if let Ok(config) = modules::config::load_app_config() {
-                    let state = handle.state::<commands::proxy::ProxyServiceState>();
-                    let cf_state = handle.state::<commands::cloudflared::CloudflaredState>();
-                    let integration =
-                        crate::modules::integration::SystemManager::Desktop(handle.clone());
-
-                    // 1. 确保管理后台开启
-                    if let Err(e) = commands::proxy::ensure_admin_server(
-                        config.proxy.clone(),
-                        &state,
-                        integration.clone(),
-                        Arc::new(cf_state.inner().clone()),
-                    )
-                    .await
-                    {
-                        error!("Failed to start admin server: {}", e);
-                    } else {
-                        info!(
-                            "Admin server (port {}) started successfully",
-                            config.proxy.port
-                        );
-                    }
-
-                    // 2. 自动启动转发逻辑
-                    if config.proxy.auto_start {
-                        if let Err(e) = commands::proxy::internal_start_proxy_service(
-                            config.proxy,
-                            &state,
-                            integration,
-                            Arc::new(cf_state.inner().clone()),
-                        )
-                        .await
-                        {
-                            error!("Failed to auto-start proxy service: {}", e);
-                        } else {
-                            info!("Proxy service auto-started successfully");
-                        }
-                    }
-                } else {
-                    // 配置加载失败不能再被静默吞掉：否则重启后“服务没起来”时无任何痕迹可查。
-                    error!(
-                        "Failed to load app config at startup; admin server and proxy service were NOT started. \
-                         Fix or reset the config file and restart the app."
-                    );
-                }
-            });
-
-            // Start smart scheduler for 7-day weekly reset warmup
-            let scheduler_state = app.handle().state::<commands::proxy::ProxyServiceState>();
-            modules::scheduler::start_scheduler(Some(app.handle().clone()), scheduler_state.inner().clone());
-            info!("Smart scheduler (7-Day Weekly Reset Warmup) initialized.");
-
-            // [PHASE 1] 已整合至 Axum 端口 (8045)，不再单独启动 19527 端口
-            info!("Management API integrated into main proxy server (port 8045)");
+            // Lite 版本不自动启动反代、管理后台或代理调度器。
+            // 账号管理仍保留 ProxyServiceState 作为兼容状态，但桌面版不创建代理服务。
+            info!("Lite mode: proxy service, admin server, and proxy scheduler are disabled");
 
             Ok(())
         })
@@ -686,6 +616,7 @@ pub fn run() {
             commands::get_token_stats_account_trend_hourly,
             commands::get_token_stats_account_trend_daily,
             commands::get_local_token_usage,
+            commands::get_api_pricing,
             proxy::cli_sync::get_cli_sync_status,
             proxy::cli_sync::execute_cli_sync,
             proxy::cli_sync::execute_cli_restore,

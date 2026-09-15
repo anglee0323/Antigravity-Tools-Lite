@@ -1225,6 +1225,13 @@ pub async fn get_local_token_usage(
         .map_err(|error| format!("读取本地 Token 统计任务失败: {}", error))?
 }
 
+/// 同步 Google 官方 API 价格，用于本地费用等价估算
+#[tauri::command]
+pub async fn get_api_pricing(
+) -> Result<crate::modules::api_pricing::ApiPricingSnapshot, String> {
+    crate::modules::api_pricing::get_api_pricing().await
+}
+
 #[tauri::command]
 pub async fn query_transit_info(url: String, key: String) -> Result<String, String> {
     let client = reqwest::Client::builder()

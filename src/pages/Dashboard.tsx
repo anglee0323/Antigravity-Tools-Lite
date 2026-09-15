@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { BarChart3, CalendarDays, Cpu, Database, MessageSquare, RefreshCw, Users } from 'lucide-react';
+import { BarChart3, CalendarDays, Cpu, Database, DollarSign, MessageSquare, RefreshCw, Users } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { request as invoke } from '../utils/request';
 import { showToast } from '../components/common/ToastContainer';
@@ -41,9 +41,32 @@ interface LocalTokenUsageSummary {
     generated_at: number;
 }
 
+interface ModelPricing {
+    input: number;
+    output: number;
+    cached: number;
+}
+
+interface ApiPricingEntry extends ModelPricing {
+    model: string;
+}
+
+interface ApiPricingSnapshot {
+    prices: ApiPricingEntry[];
+    fetched_at: number;
+    stale: boolean;
+    source: string;
+    warning?: string;
+}
+
 type RangeKey = 'today' | '7d' | '30d';
 
 const formatTokens = (value: number) => value.toLocaleString('zh-CN');
+
+const formatUsd = (value: number) => {
+    if (value === 0) return '$0.00';
+    return value < 0.01 ? `$${value.toFixed(4)}` : `$${value.toFixed(2)}`;
+};
 
 const compactTokens = (value: number) => {
     if (value >= 1_000_000) return `${(value / 1_000_000).toFixed(1)}M`;
@@ -75,6 +98,19 @@ const rangeDays: Record<RangeKey, number> = {
     '30d': 30,
 };
 
+// 离线兜底价格；在线时优先使用 Google 官方价格页同步的结果。
+const FALLBACK_MODEL_PRICING: Array<{ pattern: RegExp; pricing: ModelPricing }> = [
+    { pattern: /claude.*sonnet.*4[.\-_ ]?6/i, pricing: { input: 3, output: 15, cached: 0.3 } },
+    { pattern: /gemini.*3[.\-_ ]?1.*flash.*image/i, pricing: { input: 0.5, output: 60, cached: 0 } },
+    { pattern: /gemini.*3[.\-_ ]?8.*flash/i, pricing: { input: 0.75, output: 3.75, cached: 0.075 } },
+    { pattern: /gemini.*3[.\-_ ]?1.*pro/i, pricing: { input: 2, output: 12, cached: 0.2 } },
+    { pattern: /gemini.*3[.\-_ ]?5.*flash/i, pricing: { input: 1.5, output: 9, cached: 0.15 } },
+    { pattern: /gemini.*3.*flash/i, pricing: { input: 0.5, output: 3, cached: 0.05 } },
+    { pattern: /gemini.*2[.\-_ ]?5.*pro/i, pricing: { input: 1.25, output: 10, cached: 0.125 } },
+    { pattern: /gemini.*2[.\-_ ]?5.*flash.*lite/i, pricing: { input: 0.1, output: 0.4, cached: 0.01 } },
+    { pattern: /gemini.*2[.\-_ ]?5.*flash/i, pricing: { input: 0.3, output: 2.5, cached: 0.03 } },
+];
+
 type TokenChartPoint = LocalTokenTotals & {
     key: string;
     label: string;
@@ -88,16 +124,51 @@ const emptyTokenTotals = (): LocalTokenTotals => ({
     request_count: 0,
 });
 
+const normalizeModelName = (model: string) => model.toLowerCase().replace(/[^a-z0-9]/g, '');
+
+const findModelPricing = (model: string, snapshot: ApiPricingSnapshot | null) => {
+    const normalizedModel = normalizeModelName(model);
+    const remotePricing = snapshot?.prices.find((entry) => {
+        const normalizedEntry = normalizeModelName(entry.model);
+        return normalizedModel.includes(normalizedEntry) || normalizedEntry.includes(normalizedModel);
+    });
+    if (remotePricing) return remotePricing;
+    return FALLBACK_MODEL_PRICING.find(({ pattern }) => pattern.test(model))?.pricing;
+};
+
+const estimateApiCost = (models: LocalTokenModel[], snapshot: ApiPricingSnapshot | null) => {
+    return models.reduce(
+        (result, model) => {
+            const pricing = findModelPricing(model.model, snapshot);
+            if (!pricing) {
+                result.unpricedModels += 1;
+                return result;
+            }
+            result.usd += (
+                model.input_tokens * pricing.input
+                + model.output_tokens * pricing.output
+                + model.cached_tokens * pricing.cached
+            ) / 1_000_000;
+            return result;
+        },
+        { usd: 0, unpricedModels: 0 },
+    );
+};
+
 function TokenCard({
     label,
     value,
     color,
     icon: Icon,
+    displayValue,
+    detail,
 }: {
     label: string;
     value: number;
     color: string;
     icon: typeof Cpu;
+    displayValue?: string;
+    detail?: string;
 }) {
     return (
         <div className="rounded-2xl border border-gray-100 bg-white p-3 shadow-sm dark:border-base-200 dark:bg-base-100">
@@ -107,11 +178,11 @@ function TokenCard({
                 </span>
                 {label}
             </div>
-            <div className="text-xl font-bold tracking-tight text-gray-900 dark:text-base-content" title={formatTokens(value)}>
-                {compactTokens(value)}
+            <div className="text-xl font-bold tracking-tight text-gray-900 dark:text-base-content" title={displayValue || formatTokens(value)}>
+                {displayValue || compactTokens(value)}
             </div>
             <div className="mt-0.5 text-[10px] text-gray-400 dark:text-gray-500">
-                {formatTokens(value)} Token
+                {detail || `${formatTokens(value)} Token`}
             </div>
         </div>
     );
@@ -120,6 +191,7 @@ function TokenCard({
 function Dashboard() {
     const navigate = useNavigate();
     const [usage, setUsage] = useState<LocalTokenUsageSummary | null>(null);
+    const [pricing, setPricing] = useState<ApiPricingSnapshot | null>(null);
     const [range, setRange] = useState<RangeKey>('today');
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
@@ -140,11 +212,26 @@ function Dashboard() {
         }
     }, []);
 
+    const fetchPricing = useCallback(async () => {
+        try {
+            const result = await invoke<ApiPricingSnapshot>('get_api_pricing');
+            setPricing(result);
+        } catch (fetchError) {
+            console.warn('读取 Google 官方 API 价格失败，使用内置兜底价格：', fetchError);
+            setPricing(null);
+        }
+    }, []);
+
     useEffect(() => {
         fetchUsage();
-        const interval = window.setInterval(fetchUsage, 60_000);
-        return () => window.clearInterval(interval);
-    }, [fetchUsage]);
+        fetchPricing();
+        const usageInterval = window.setInterval(fetchUsage, 60_000);
+        const pricingInterval = window.setInterval(fetchPricing, 24 * 60 * 60 * 1000);
+        return () => {
+            window.clearInterval(usageInterval);
+            window.clearInterval(pricingInterval);
+        };
+    }, [fetchPricing, fetchUsage]);
 
     const totals = useMemo<LocalTokenTotals>(() => {
         if (!usage) {
@@ -201,6 +288,18 @@ function Dashboard() {
         if (range === '7d') return usage.by_model_7_days;
         return usage.by_model;
     }, [range, usage]);
+
+    const cacheHitRate = useMemo(() => {
+        const denominator = totals.input_tokens + totals.cached_tokens;
+        return denominator > 0 ? (totals.cached_tokens / denominator) * 100 : 0;
+    }, [totals]);
+
+    const apiCost = useMemo(() => estimateApiCost(modelsForRange, pricing), [modelsForRange, pricing]);
+    const pricingLabel = pricing
+        ? pricing.stale
+            ? '使用本地价格缓存'
+            : '已同步 Google 官方价格'
+        : '内置价格兜底';
 
     return (
         <div className="h-full w-full overflow-y-auto">
@@ -262,8 +361,22 @@ function Dashboard() {
                     <TokenCard label={`${rangeLabels[range]}总 Token`} value={totals.total_tokens} color="bg-blue-50 text-blue-600 dark:bg-blue-900/20 dark:text-blue-300" icon={BarChart3} />
                     <TokenCard label="输入 Token" value={totals.input_tokens} color="bg-indigo-50 text-indigo-600 dark:bg-indigo-900/20 dark:text-indigo-300" icon={MessageSquare} />
                     <TokenCard label="输出 Token" value={totals.output_tokens} color="bg-purple-50 text-purple-600 dark:bg-purple-900/20 dark:text-purple-300" icon={Cpu} />
-                    <TokenCard label="缓存 Token" value={totals.cached_tokens} color="bg-cyan-50 text-cyan-600 dark:bg-cyan-900/20 dark:text-cyan-300" icon={Database} />
-                    <TokenCard label="请求次数" value={totals.request_count} color="bg-emerald-50 text-emerald-600 dark:bg-emerald-900/20 dark:text-emerald-300" icon={MessageSquare} />
+                    <TokenCard
+                        label="缓存命中率"
+                        value={cacheHitRate}
+                        displayValue={`${cacheHitRate.toFixed(1)}%`}
+                        detail="缓存 Token /（输入 + 缓存）"
+                        color="bg-emerald-50 text-emerald-600 dark:bg-emerald-900/20 dark:text-emerald-300"
+                        icon={Database}
+                    />
+                    <TokenCard
+                        label="API 费用估算"
+                        value={apiCost.usd}
+                        displayValue={formatUsd(apiCost.usd)}
+                        detail={`${formatTokens(totals.request_count)} 次 API 请求 · ${pricingLabel}${apiCost.unpricedModels ? ' · 部分模型未计价' : ''}`}
+                        color="bg-amber-50 text-amber-600 dark:bg-amber-900/20 dark:text-amber-300"
+                        icon={DollarSign}
+                    />
                 </div>
 
                 <div className="grid gap-3 lg:grid-cols-[1.35fr_1fr]">
@@ -290,7 +403,7 @@ function Dashboard() {
                                     </div>
                                 ) : (
                                     <div className="flex h-full items-center justify-end text-[11px] text-gray-400 dark:text-gray-500">
-                                        悬浮柱子查看用量
+                                        悬浮查看用量
                                     </div>
                                 )}
                             </div>

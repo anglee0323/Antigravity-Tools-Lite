@@ -1789,6 +1789,21 @@ pub fn export_accounts() -> Result<Vec<(String, String)>, String> {
     Ok(exports)
 }
 
+/// Reuse a cached project ID only after a subscription tier has been recorded.
+/// New accounts may already have the generic `aicode-consumers` project ID, but
+/// still need one loadCodeAssist request to discover whether they are PRO/ULTRA.
+fn cached_project_id_for_quota(account: &Account) -> Option<&str> {
+    let has_subscription_tier = account
+        .quota
+        .as_ref()
+        .and_then(|quota| quota.subscription_tier.as_deref())
+        .is_some_and(|tier| !tier.trim().is_empty());
+
+    has_subscription_tier
+        .then(|| account.token.project_id.as_deref())
+        .flatten()
+}
+
 /// Quota query with retry (moved from commands to modules for reuse)
 pub async fn fetch_quota_with_retry(account: &mut Account) -> crate::error::AppResult<QuotaData> {
     use crate::error::AppError;
@@ -1861,12 +1876,15 @@ pub async fn fetch_quota_with_retry(account: &mut Account) -> crate::error::AppR
         }
     }
 
-    // 2. Attempt query (pass cached project_id if available to avoid unnecessary loadCodeAssist)
+    // 2. Query quota. A missing tier must trigger loadCodeAssist at least once;
+    // otherwise a newly added account with a cached project_id never gets its
+    // subscription tier persisted and the UI cannot show PRO/ULTRA.
+    let cached_project_id = cached_project_id_for_quota(account);
     let result: crate::error::AppResult<(QuotaData, Option<String>)> =
         modules::fetch_quota_with_cache(
             &account.token.access_token,
             &account.email,
-            account.token.project_id.as_deref(),
+            cached_project_id,
             Some(&account.id),
         )
         .await;
@@ -1957,12 +1975,13 @@ pub async fn fetch_quota_with_retry(account: &mut Account) -> crate::error::AppR
                 upsert_account(account.email.clone(), name, new_token.clone())
                     .map_err(AppError::Account)?;
 
-                // Retry query (pass cached project_id if available)
+                // Retry query, preserving the same tier-discovery behavior.
+                let retry_cached_project_id = cached_project_id_for_quota(account);
                 let retry_result: crate::error::AppResult<(QuotaData, Option<String>)> =
                     modules::fetch_quota_with_cache(
                         &new_token.access_token,
                         &account.email,
-                        account.token.project_id.as_deref(),
+                        retry_cached_project_id,
                         Some(&account.id),
                     )
                     .await;

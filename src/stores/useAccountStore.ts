@@ -306,7 +306,12 @@ export const useAccountStore = create<AccountState>((set, get) => ({
             const updatedAccounts = accounts.map(acc =>
                 acc.id === accountId ? { ...acc, custom_label: label || undefined } : acc
             );
-            set({ accounts: updatedAccounts });
+            set(state => ({
+                accounts: updatedAccounts,
+                currentAccount: state.currentAccount?.id === accountId
+                    ? { ...state.currentAccount, custom_label: label || undefined }
+                    : state.currentAccount,
+            }));
         } catch (error) {
             console.error('[AccountStore] Update label failed:', error);
             throw error;

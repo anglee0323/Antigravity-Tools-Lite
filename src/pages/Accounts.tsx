@@ -39,6 +39,7 @@ function Accounts() {
     loading,
     refreshQuota,
     reorderAccounts,
+    updateAccountLabel,
   } = useAccountStore();
   const { config } = useConfigStore();
 
@@ -68,6 +69,9 @@ function Accounts() {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [isBatchDelete, setIsBatchDelete] = useState(false);
   const [accountToDelete, setAccountToDelete] = useState<Account | null>(null);
+  const [accountToEditLabel, setAccountToEditLabel] = useState<Account | null>(null);
+  const [labelDraft, setLabelDraft] = useState('');
+  const [isSavingLabel, setIsSavingLabel] = useState(false);
   const [refreshingIds, setRefreshingIds] = useState<Set<string>>(new Set());
   const containerRef = useRef<HTMLDivElement>(null);
   const [containerSize, setContainerSize] = useState({ width: 0, height: 0 });
@@ -295,6 +299,35 @@ function Accounts() {
   const handleDelete = (accountId: string) => {
     const account = accounts.find((item) => item.id === accountId);
     if (account) setAccountToDelete(account);
+  };
+
+  const handleEditLabel = (accountId: string) => {
+    const account = accounts.find((item) => item.id === accountId);
+    if (!account) return;
+    setAccountToEditLabel(account);
+    setLabelDraft(account.custom_label || '');
+  };
+
+  const cancelEditLabel = () => {
+    if (isSavingLabel) return;
+    setAccountToEditLabel(null);
+    setLabelDraft('');
+  };
+
+  const executeUpdateLabel = async () => {
+    if (!accountToEditLabel || isSavingLabel) return;
+    setIsSavingLabel(true);
+    try {
+      await updateAccountLabel(accountToEditLabel.id, labelDraft.trim());
+      showToast(t('accounts.remark_updated', '备注已更新'), 'success');
+      setAccountToEditLabel(null);
+      setLabelDraft('');
+    } catch (error) {
+      console.error('[Accounts] Update remark failed:', error);
+      showToast(`${t('common.error')}: ${error}`, 'error');
+    } finally {
+      setIsSavingLabel(false);
+    }
   };
 
   const executeDelete = async () => {
@@ -659,6 +692,7 @@ function Accounts() {
                 switchingAccountId={switchingAccountId}
                 onSwitch={handleSwitch}
                 onRefresh={handleRefresh}
+                onEditLabel={handleEditLabel}
                 onDelete={handleDelete}
                 onReorder={reorderAccounts}
                 quotaWindow={quotaWindow}
@@ -676,6 +710,7 @@ function Accounts() {
               switchingAccountId={switchingAccountId}
               onSwitch={handleSwitch}
               onRefresh={handleRefresh}
+              onEditLabel={handleEditLabel}
               onDelete={handleDelete}
               quotaWindow={quotaWindow}
             />
@@ -745,6 +780,39 @@ function Accounts() {
         onConfirm={executeRefresh}
         onCancel={() => setIsRefreshConfirmOpen(false)}
       />
+
+      <ModalDialog
+        isOpen={accountToEditLabel !== null}
+        title={t('accounts.edit_remark', '编辑备注')}
+        type="confirm"
+        confirmText={isSavingLabel ? t('common.loading') : t('common.save')}
+        onConfirm={executeUpdateLabel}
+        onCancel={cancelEditLabel}
+      >
+        <div className="space-y-2">
+          <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
+            {t('accounts.remark', '备注')}
+          </label>
+          <input
+            autoFocus
+            type="text"
+            maxLength={15}
+            value={labelDraft}
+            onChange={(event) => setLabelDraft(event.target.value)}
+            onKeyDown={(event) => {
+              if (event.key === 'Enter') {
+                event.preventDefault();
+                void executeUpdateLabel();
+              }
+            }}
+            placeholder={t('accounts.remark_placeholder', '输入备注（最多15个字符）')}
+            className="w-full px-3 py-2.5 bg-white dark:bg-base-200 text-gray-900 dark:text-base-content border border-gray-200 dark:border-base-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500"
+          />
+          <div className="text-right text-xs text-gray-400 dark:text-gray-500">
+            {Array.from(labelDraft).length}/15
+          </div>
+        </div>
+      </ModalDialog>
 
     </div>
   );

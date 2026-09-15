@@ -18,6 +18,7 @@ interface AccountCardProps {
     isSwitching?: boolean;
     onSwitch: (targetIde?: string) => void;
     onRefresh: () => void;
+    onEditLabel: () => void;
     onDelete: () => void;
     quotaWindow?: '5h' | 'weekly';
 }
@@ -30,7 +31,7 @@ const DEFAULT_MODELS = Object.entries(MODEL_CONFIG).map(([id, config]) => ({
     Icon: config.Icon
 }));
 
-function AccountCard({ account, selected, onSelect, isCurrent: propIsCurrent, isRefreshing, isSwitching = false, onSwitch, onRefresh, onDelete, quotaWindow }: AccountCardProps) {
+function AccountCard({ account, selected, onSelect, isCurrent: propIsCurrent, isRefreshing, isSwitching = false, onSwitch, onRefresh, onEditLabel, onDelete, quotaWindow }: AccountCardProps) {
     const { t } = useTranslation();
     const { config, showAllQuotas } = useConfigStore();
     const isDisabled = Boolean(account.disabled);
@@ -284,6 +285,15 @@ function AccountCard({ account, selected, onSelect, isCurrent: propIsCurrent, is
                         title={isDisabled ? t('accounts.disabled_tooltip') : t('common.refresh')}
                     >
                         <RefreshCw className={`w-3.5 h-3.5 ${isRefreshing ? 'animate-spin' : ''}`} />
+                    </button>
+                    <button
+                        className="p-1.5 rounded-lg transition-all text-gray-400 hover:text-orange-600 hover:bg-orange-50 dark:hover:text-orange-400 dark:hover:bg-orange-900/30 disabled:cursor-not-allowed disabled:opacity-50"
+                        onClick={(e) => { e.stopPropagation(); onEditLabel(); }}
+                        disabled={isRefreshing || isSwitching}
+                        title={t('accounts.edit_remark', '编辑备注')}
+                        aria-label={`${t('accounts.edit_remark', '编辑备注')} ${account.email}`}
+                    >
+                        <Tag className="w-3.5 h-3.5" />
                     </button>
                     <button
                         className="p-1.5 rounded-lg transition-all text-gray-400 hover:text-red-600 hover:bg-red-50 dark:hover:text-red-400 dark:hover:bg-red-900/30"

@@ -11,12 +11,13 @@ interface AccountGridProps {
     switchingAccountId: string | null;
     onSwitch: (accountId: string, targetIde?: string) => void;
     onRefresh: (accountId: string) => void;
+    onEditLabel: (accountId: string) => void;
     onDelete: (accountId: string) => void;
     quotaWindow?: '5h' | 'weekly';
 }
 
 
-function AccountGrid({ accounts, selectedIds, refreshingIds, onToggleSelect, currentAccountId, switchingAccountId, onSwitch, onRefresh, onDelete, quotaWindow }: AccountGridProps) {
+function AccountGrid({ accounts, selectedIds, refreshingIds, onToggleSelect, currentAccountId, switchingAccountId, onSwitch, onRefresh, onEditLabel, onDelete, quotaWindow }: AccountGridProps) {
     const { t } = useTranslation();
     if (accounts.length === 0) {
         return (
@@ -40,6 +41,7 @@ function AccountGrid({ accounts, selectedIds, refreshingIds, onToggleSelect, cur
                     isSwitching={account.id === switchingAccountId}
                     onSwitch={(targetIde?: string) => onSwitch(account.id, targetIde)}
                     onRefresh={() => onRefresh(account.id)}
+                    onEditLabel={() => onEditLabel(account.id)}
                     onDelete={() => onDelete(account.id)}
                     quotaWindow={quotaWindow}
                 />

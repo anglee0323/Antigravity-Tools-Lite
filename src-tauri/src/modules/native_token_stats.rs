@@ -45,6 +45,11 @@ pub struct LocalTokenUsageSummary {
     pub last_7_days: LocalTokenTotals,
     pub last_30_days: LocalTokenTotals,
     pub daily: Vec<LocalTokenDaily>,
+    /// Model totals for today. `by_model` remains the 30-day view for compatibility.
+    pub by_model_today: Vec<LocalTokenModel>,
+    /// Model totals for the last 7 days.
+    pub by_model_7_days: Vec<LocalTokenModel>,
+    /// Model totals for the last 30 days.
     pub by_model: Vec<LocalTokenModel>,
     pub databases_scanned: u64,
     pub generations_scanned: u64,
@@ -106,7 +111,9 @@ pub fn get_local_token_usage() -> Result<LocalTokenUsageSummary, String> {
     let mut last_7_days_totals = LocalTokenTotals::default();
     let mut last_30_days_totals = LocalTokenTotals::default();
     let mut daily: BTreeMap<NaiveDate, LocalTokenTotals> = BTreeMap::new();
-    let mut by_model: BTreeMap<String, LocalTokenTotals> = BTreeMap::new();
+    let mut by_model_today: BTreeMap<String, LocalTokenTotals> = BTreeMap::new();
+    let mut by_model_7_days: BTreeMap<String, LocalTokenTotals> = BTreeMap::new();
+    let mut by_model_30_days: BTreeMap<String, LocalTokenTotals> = BTreeMap::new();
     let mut last_activity = None;
 
     for event in events {
@@ -117,13 +124,24 @@ pub fn get_local_token_usage() -> Result<LocalTokenUsageSummary, String> {
 
         add_event(&mut last_30_days_totals, &event);
         add_event(daily.entry(date).or_default(), &event);
-        add_event(by_model.entry(event.model.clone()).or_default(), &event);
+        add_event(
+            by_model_30_days.entry(event.model.clone()).or_default(),
+            &event,
+        );
 
         if date == today {
             add_event(&mut today_totals, &event);
+            add_event(
+                by_model_today.entry(event.model.clone()).or_default(),
+                &event,
+            );
         }
         if date >= today - Duration::days(6) {
             add_event(&mut last_7_days_totals, &event);
+            add_event(
+                by_model_7_days.entry(event.model.clone()).or_default(),
+                &event,
+            );
         }
         last_activity = Some(
             last_activity.map_or(event.timestamp_seconds, |current: i64| {
@@ -144,7 +162,25 @@ pub fn get_local_token_usage() -> Result<LocalTokenUsageSummary, String> {
         })
         .collect();
 
-    let mut by_model: Vec<LocalTokenModel> = by_model
+    Ok(LocalTokenUsageSummary {
+        today: today_totals,
+        last_7_days: last_7_days_totals,
+        last_30_days: last_30_days_totals,
+        daily,
+        by_model_today: model_totals(by_model_today),
+        by_model_7_days: model_totals(by_model_7_days),
+        by_model: model_totals(by_model_30_days),
+        databases_scanned: database_paths.len() as u64,
+        generations_scanned,
+        skipped_large_records,
+        unreadable_databases,
+        last_activity,
+        generated_at: now.timestamp(),
+    })
+}
+
+fn model_totals(by_model: BTreeMap<String, LocalTokenTotals>) -> Vec<LocalTokenModel> {
+    let mut models: Vec<LocalTokenModel> = by_model
         .into_iter()
         .map(|(model, totals)| LocalTokenModel {
             model,
@@ -155,26 +191,13 @@ pub fn get_local_token_usage() -> Result<LocalTokenUsageSummary, String> {
             request_count: totals.request_count,
         })
         .collect();
-    by_model.sort_by(|left, right| {
+    models.sort_by(|left, right| {
         right
             .total_tokens
             .cmp(&left.total_tokens)
             .then_with(|| left.model.cmp(&right.model))
     });
-
-    Ok(LocalTokenUsageSummary {
-        today: today_totals,
-        last_7_days: last_7_days_totals,
-        last_30_days: last_30_days_totals,
-        daily,
-        by_model,
-        databases_scanned: database_paths.len() as u64,
-        generations_scanned,
-        skipped_large_records,
-        unreadable_databases,
-        last_activity,
-        generated_at: now.timestamp(),
-    })
+    models
 }
 
 fn add_event(totals: &mut LocalTokenTotals, event: &GenerationEvent) {

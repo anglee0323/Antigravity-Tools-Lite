@@ -102,25 +102,27 @@ function Navbar() {
             )}
 
             <div className="max-w-7xl mx-auto px-8 relative" style={{ zIndex: 10 }}>
-                {/* Flexbox 布局 - 子组件自己处理响应式 */}
-                <div className="flex items-center h-16 gap-4">
+                {/* 三项主导航独立绝对居中，避免两侧内容宽度不同造成视觉偏右 */}
+                <div className="relative flex h-16 items-center justify-between gap-4">
                     {/* Logo - 使用父容器宽度做响应式 */}
                     <div className="@container/logo basis-[200px] shrink min-w-0">
                         <NavLogo />
                     </div>
 
                     {/* 导航菜单 - 自己处理响应式 */}
-                    <div className="flex-1 flex justify-center">
+                    <div className="absolute left-1/2 top-1/2 flex -translate-x-1/2 -translate-y-1/2">
                         <NavMenu navItems={navItems} />
                     </div>
 
                     {/* 设置按钮 - 自己处理响应式 */}
-                    <NavSettings
-                        theme={(config?.theme as 'light' | 'dark') || 'light'}
-                        currentLanguage={config?.language || 'en'}
-                        onThemeToggle={toggleTheme}
-                        onLanguageChange={handleLanguageChange}
-                    />
+                    <div className="ml-auto shrink-0">
+                        <NavSettings
+                            theme={(config?.theme as 'light' | 'dark') || 'light'}
+                            currentLanguage={config?.language || 'en'}
+                            onThemeToggle={toggleTheme}
+                            onLanguageChange={handleLanguageChange}
+                        />
+                    </div>
                 </div>
             </div>
         </nav>

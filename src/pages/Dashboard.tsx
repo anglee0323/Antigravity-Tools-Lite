@@ -268,7 +268,7 @@ function Dashboard() {
 
                 <div className="grid gap-3 lg:grid-cols-[1.35fr_1fr]">
                     <section className="rounded-2xl border border-gray-100 bg-white p-4 shadow-sm dark:border-base-200 dark:bg-base-100">
-                        <div className="mb-3 flex items-start justify-between gap-3">
+                        <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
                             <div>
                                 <h2 className="flex items-center gap-2 text-sm font-semibold text-gray-900 dark:text-base-content">
                                     <BarChart3 className="h-4 w-4 text-blue-500" />
@@ -276,7 +276,7 @@ function Dashboard() {
                                 </h2>
                                 <p className="mt-0.5 text-[11px] text-gray-400 dark:text-gray-500">按本地生成记录统计</p>
                             </div>
-                            <div className="pointer-events-none h-11 w-[230px] shrink-0 overflow-hidden text-right" aria-live="polite">
+                            <div className="pointer-events-none h-14 w-full shrink-0 overflow-hidden text-right sm:w-[230px]" aria-live="polite">
                                 {hoveredPoint ? (
                                     <div className="flex h-full flex-col justify-center">
                                         <div className="text-[10px] font-medium leading-3 text-blue-600 dark:text-blue-400">{hoveredPoint.label}</div>

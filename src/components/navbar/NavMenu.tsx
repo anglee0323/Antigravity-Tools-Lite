@@ -10,11 +10,9 @@ interface NavMenuProps {
  * 导航菜单组件 - 独立处理响应式
  * 
  * 响应式策略:
- * - ≥ 768px (md): 文字胶囊
- * - 640px - 768px: 图标胶囊 (Logo 显示文字)
- * - 480px - 640px: 图标胶囊 (Logo 隐藏文字)
- * - 375px - 480px: 图标+文字下拉
- * - < 375px: 图标下拉
+ * - ≥ 880px: 文字胶囊
+ * - 480px - 880px: 三项图标胶囊
+ * - < 480px: 下拉菜单
  */
 export function NavMenu({ navItems }: NavMenuProps) {
     const location = useLocation();
@@ -23,8 +21,8 @@ export function NavMenu({ navItems }: NavMenuProps) {
 
     return (
         <>
-            {/* 文字胶囊 (≥ 1120px) */}
-            <nav className="max-[1119px]:hidden flex items-center gap-1 bg-gray-100 dark:bg-base-200 rounded-full p-1">
+            {/* 文字胶囊 (≥ 880px) */}
+            <nav className="hidden min-[880px]:flex items-center gap-1 rounded-full bg-gray-100 p-1 dark:bg-base-200">
                 {visibleNavItems.map((item) => (
                     <Link
                         key={item.path}
@@ -36,7 +34,7 @@ export function NavMenu({ navItems }: NavMenuProps) {
                             rounded-full 
                             text-sm 
                             font-medium 
-                            transition-all 
+                            transition-colors
                             whitespace-nowrap
                             ${isActive(location.pathname, item.path)
                                 ? 'bg-gray-900 text-white shadow-sm dark:bg-white dark:text-gray-900'
@@ -49,8 +47,8 @@ export function NavMenu({ navItems }: NavMenuProps) {
                 ))}
             </nav>
 
-            {/* 图标胶囊 (880px - 1120px) - Logo 显示文字 */}
-            <nav className="max-[879px]:hidden min-[1120px]:hidden flex items-center gap-1 bg-gray-100 dark:bg-base-200 rounded-full p-1">
+            {/* 图标胶囊 (480px - 880px) */}
+            <nav className="hidden min-[480px]:flex min-[880px]:hidden items-center gap-1 rounded-full bg-gray-100 p-1 dark:bg-base-200">
                 {visibleNavItems.map((item) => (
                     <Link
                         key={item.path}
@@ -59,53 +57,7 @@ export function NavMenu({ navItems }: NavMenuProps) {
                         className={`
                             p-2
                             rounded-full
-                            transition-all
-                            ${isActive(location.pathname, item.path)
-                                ? 'bg-gray-900 text-white shadow-sm dark:bg-white dark:text-gray-900'
-                                : 'text-gray-700 hover:text-gray-900 hover:bg-gray-200 dark:text-gray-400 dark:hover:text-base-content dark:hover:bg-base-100'
-                            }
-                        `}
-                        title={item.label}
-                    >
-                        <item.icon className="w-5 h-5" />
-                    </Link>
-                ))}
-            </nav>
-
-            {/* 图标胶囊 (640px - 880px) - Logo 隐藏文字 */}
-            <nav className="max-[639px]:hidden min-[880px]:hidden flex items-center gap-1 bg-gray-100 dark:bg-base-200 rounded-full p-1">
-                {visibleNavItems.map((item) => (
-                    <Link
-                        key={item.path}
-                        to={item.path}
-                        draggable="false"
-                        className={`
-                            p-2
-                            rounded-full
-                            transition-all
-                            ${isActive(location.pathname, item.path)
-                                ? 'bg-gray-900 text-white shadow-sm dark:bg-white dark:text-gray-900'
-                                : 'text-gray-700 hover:text-gray-900 hover:bg-gray-200 dark:text-gray-400 dark:hover:text-base-content dark:hover:bg-base-100'
-                            }
-                        `}
-                        title={item.label}
-                    >
-                        <item.icon className="w-5 h-5" />
-                    </Link>
-                ))}
-            </nav>
-
-            {/* 图标胶囊 (480px - 640px) */}
-            <nav className="max-[479px]:hidden min-[640px]:hidden flex items-center gap-1 bg-gray-100 dark:bg-base-200 rounded-full p-1">
-                {visibleNavItems.map((item) => (
-                    <Link
-                        key={item.path}
-                        to={item.path}
-                        draggable="false"
-                        className={`
-                            p-2
-                            rounded-full
-                            transition-all
+                            transition-colors
                             ${isActive(location.pathname, item.path)
                                 ? 'bg-gray-900 text-white shadow-sm dark:bg-white dark:text-gray-900'
                                 : 'text-gray-700 hover:text-gray-900 hover:bg-gray-200 dark:text-gray-400 dark:hover:text-base-content dark:hover:bg-base-100'

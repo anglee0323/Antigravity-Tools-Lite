@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { BarChart3, CalendarDays, Cpu, Database, DollarSign, MessageSquare, RefreshCw, Users } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { request as invoke } from '../utils/request';
@@ -84,6 +84,15 @@ const dateKey = (date: Date) => {
 const shortDate = (key: string) => {
     const [, month, day] = key.split('-');
     return `${Number(month)}/${Number(day)}`;
+};
+
+const formatTime = (timestamp?: number | null) => {
+    if (!timestamp) return '';
+    return new Date(timestamp).toLocaleTimeString('zh-CN', {
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+    });
 };
 
 const rangeLabels: Record<RangeKey, string> = {
@@ -196,18 +205,28 @@ function Dashboard() {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const [hoveredPoint, setHoveredPoint] = useState<TokenChartPoint | null>(null);
+    const [lastUpdatedAt, setLastUpdatedAt] = useState<number | null>(null);
+    const fetchInFlight = useRef(false);
 
-    const fetchUsage = useCallback(async () => {
+    const fetchUsage = useCallback(async (notify = false) => {
+        if (fetchInFlight.current) return;
+        fetchInFlight.current = true;
         setLoading(true);
         setError(null);
         try {
             const result = await invoke<LocalTokenUsageSummary>('get_local_token_usage');
             setUsage(result);
+            setLastUpdatedAt(Date.now());
+            if (notify) {
+                const dataTime = result.last_activity ? `，数据截至 ${formatTime(result.last_activity * 1000)}` : '';
+                showToast(`本地 Token 统计已更新${dataTime}`, 'success');
+            }
         } catch (fetchError) {
             const message = String(fetchError);
             setError(message);
             showToast(`读取本地 Token 统计失败：${message}`, 'error');
         } finally {
+            fetchInFlight.current = false;
             setLoading(false);
         }
     }, []);
@@ -315,6 +334,13 @@ function Dashboard() {
                         </p>
                     </div>
                     <div className="flex flex-wrap items-center justify-end gap-2">
+                        <span className="text-[10px] text-gray-400 dark:text-gray-500" aria-live="polite">
+                            {loading
+                                ? '正在扫描本地记录…'
+                                : lastUpdatedAt
+                                    ? `已扫描 ${formatTime(lastUpdatedAt)}${usage?.last_activity ? ` · 数据截至 ${formatTime(usage.last_activity * 1000)}` : ''}`
+                                    : '等待扫描'}
+                        </span>
                         <div className="flex items-center gap-1 rounded-xl border border-gray-100 bg-white p-1 shadow-sm dark:border-base-200 dark:bg-base-100">
                             <div className="flex items-center gap-1 px-1 text-[11px] text-gray-500 dark:text-gray-400">
                                 <CalendarDays className="h-3.5 w-3.5" />
@@ -341,12 +367,12 @@ function Dashboard() {
                             账号管理
                         </button>
                         <button
-                            onClick={fetchUsage}
+                            onClick={() => fetchUsage(true)}
                             disabled={loading}
                             className="flex items-center gap-1.5 rounded-xl bg-blue-500 px-2.5 py-1.5 text-xs font-medium text-white transition-colors hover:bg-blue-600 disabled:cursor-not-allowed disabled:opacity-60"
                         >
                             <RefreshCw className={`h-3.5 w-3.5 ${loading ? 'animate-spin' : ''}`} />
-                            刷新
+                            {loading ? '刷新中…' : '刷新'}
                         </button>
                     </div>
                 </div>
@@ -354,6 +380,12 @@ function Dashboard() {
                 {error && (
                     <div className="rounded-xl border border-red-100 bg-red-50 px-3 py-2 text-xs text-red-600 dark:border-red-900/30 dark:bg-red-900/10 dark:text-red-300">
                         {error}
+                    </div>
+                )}
+
+                {!!usage?.unreadable_databases && (
+                    <div className="rounded-xl border border-amber-100 bg-amber-50 px-3 py-2 text-xs text-amber-700 dark:border-amber-900/30 dark:bg-amber-900/10 dark:text-amber-300">
+                        有 {usage.unreadable_databases} 个本地对话数据库暂时无法读取，本次统计可能不完整；稍后再刷新即可重试。
                     </div>
                 )}
 

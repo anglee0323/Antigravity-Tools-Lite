@@ -121,15 +121,25 @@ function AddAccountDialog({ onAdd, showText = true }: AddAccountDialogProps) {
         if (activeTab !== 'oauth') return;
         if (oauthUrl) return;
 
+        let disposed = false;
         invoke<any>('prepare_oauth_url')
             .then((res) => {
                 const url = typeof res === 'string' ? res : res?.url;
-                if (url && url.length > 0) setOauthUrl(url);
+                if (!url || url.length === 0) return;
+                if (disposed) {
+                    cancelOAuthLogin().catch(() => { });
+                    return;
+                }
+                setOauthUrl(url);
             })
             .catch((e) => {
                 console.error('Failed to prepare OAuth URL:', e);
             });
-    }, [isOpen, activeTab, oauthUrl]);
+
+        return () => {
+            disposed = true;
+        };
+    }, [isOpen, activeTab, oauthUrl, cancelOAuthLogin]);
 
     // If user navigates away from OAuth tab, cancel prepared flow to release the port.
     useEffect(() => {
@@ -148,6 +158,15 @@ function AddAccountDialog({ onAdd, showText = true }: AddAccountDialogProps) {
         setRefreshToken('');
         setOauthUrl('');
         setOauthUrlCopied(false);
+        setManualCode('');
+    };
+
+    const closeDialog = async () => {
+        if (activeTab === 'oauth') {
+            await cancelOAuthLogin().catch(() => { });
+        }
+        setIsOpen(false);
+        resetState();
     };
 
     const handleAction = async (
@@ -485,7 +504,7 @@ function AddAccountDialog({ onAdd, showText = true }: AddAccountDialogProps) {
                     <div data-tauri-drag-region className="fixed top-0 left-0 right-0 h-8 z-[1]" />
 
                     {/* Click outside to close */}
-                    <div className="absolute inset-0 z-[0]" onClick={() => setIsOpen(false)} />
+                    <div className="absolute inset-0 z-[0]" onClick={() => void closeDialog()} />
 
                     <div className="bg-white dark:bg-base-100 text-gray-900 dark:text-base-content rounded-2xl shadow-2xl w-full max-w-lg p-6 relative z-[10] m-4 max-h-[90vh] overflow-y-auto">
                         <h3 className="font-bold text-lg mb-4">{t('accounts.add.title')}</h3>
@@ -698,12 +717,7 @@ function AddAccountDialog({ onAdd, showText = true }: AddAccountDialogProps) {
                         <div className="flex gap-3 w-full mt-6">
                             <button
                                 className="flex-1 px-4 py-2.5 bg-gray-100 dark:bg-base-200 text-gray-700 dark:text-gray-300 font-medium rounded-xl hover:bg-gray-200 dark:hover:bg-base-300 transition-colors focus:outline-none focus:ring-2 focus:ring-200 dark:focus:ring-base-300"
-                                onClick={async () => {
-                                    if (status === 'loading' && activeTab === 'oauth') {
-                                        await cancelOAuthLogin();
-                                    }
-                                    setIsOpen(false);
-                                }}
+                                onClick={() => void closeDialog()}
                                 disabled={status === 'success'} // Only disable on success, allow cancel on loading
                             >
                                 {t('accounts.add.btn_cancel')}

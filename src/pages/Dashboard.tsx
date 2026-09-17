@@ -107,6 +107,12 @@ const rangeDays: Record<RangeKey, number> = {
     '30d': 30,
 };
 
+const chartBarMaxWidth: Record<RangeKey, number> = {
+    today: 12,
+    '7d': 32,
+    '30d': 8,
+};
+
 // 离线兜底价格；在线时优先使用 Google 官方价格页同步的结果。
 const FALLBACK_MODEL_PRICING: Array<{ pattern: RegExp; pricing: ModelPricing }> = [
     { pattern: /claude.*sonnet.*4[.\-_ ]?6/i, pricing: { input: 3, output: 15, cached: 0.3 } },
@@ -321,8 +327,8 @@ function Dashboard() {
         : '内置价格兜底';
 
     return (
-        <div className="h-full w-full overflow-y-auto">
-            <div className="mx-auto max-w-7xl space-y-3 p-4 lg:p-5">
+        <div className="h-full w-full overflow-y-auto lg:overflow-hidden">
+            <div className="mx-auto flex min-h-full max-w-7xl flex-col gap-2 p-3 lg:h-full lg:min-h-0 lg:p-4">
                 <div className="flex flex-wrap items-center justify-between gap-2">
                     <div className="min-w-0">
                         <h1 className="flex items-center gap-2 text-xl font-bold text-gray-900 dark:text-base-content">
@@ -411,9 +417,9 @@ function Dashboard() {
                     />
                 </div>
 
-                <div className="grid gap-3 lg:grid-cols-[1.35fr_1fr]">
-                    <section className="rounded-2xl border border-gray-100 bg-white p-4 shadow-sm dark:border-base-200 dark:bg-base-100">
-                        <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                <div className="grid shrink-0 gap-2 lg:h-[176px] lg:grid-cols-[1.35fr_1fr]">
+                    <section className="rounded-2xl border border-gray-100 bg-white p-3 shadow-sm dark:border-base-200 dark:bg-base-100 lg:flex lg:min-h-0 lg:flex-col">
+                        <div className="mb-1.5 flex flex-col gap-1.5 sm:flex-row sm:items-start sm:justify-between">
                             <div>
                                 <h2 className="flex items-center gap-2 text-sm font-semibold text-gray-900 dark:text-base-content">
                                     <BarChart3 className="h-4 w-4 text-blue-500" />
@@ -440,35 +446,42 @@ function Dashboard() {
                                 )}
                             </div>
                         </div>
-                        <div className="flex h-32 items-end gap-1 border-b border-gray-100 pb-1 dark:border-base-200">
+                        <div
+                            className="flex h-24 items-end gap-1 border-b border-gray-100 pb-1 dark:border-base-200 lg:min-h-0 lg:flex-1"
+                            onMouseLeave={() => setHoveredPoint(null)}
+                        >
                             {chartPoints.map((point, index) => {
-                                const height = point.total_tokens === 0 ? 4 : Math.max((point.total_tokens / maxChartTokens) * 100, 8);
+                                const isEmpty = point.total_tokens === 0;
+                                const height = Math.max((point.total_tokens / maxChartTokens) * 100, 6);
                                 const showPointLabel = range === 'today'
                                     ? index % 3 === 0 || index === chartPoints.length - 1
                                     : range !== '30d' || index % 5 === 0 || index === chartPoints.length - 1;
                                 return (
                                     <div
                                         key={point.key}
-                                        className="group flex h-full flex-1 flex-col items-center justify-end gap-2"
+                                        className="group flex h-full min-w-0 flex-1 flex-col items-center justify-end gap-2"
                                         onMouseEnter={() => setHoveredPoint(point)}
-                                        onMouseLeave={() => setHoveredPoint(null)}
                                     >
-                                        <div className="relative flex w-full flex-1 items-end justify-center">
+                                        <div className="relative flex w-full min-w-0 flex-1 items-end justify-center">
                                             <div
-                                                className={`w-full rounded-t-lg bg-gradient-to-t from-blue-500 to-cyan-400 transition-colors group-hover:from-blue-600 group-hover:to-cyan-500 ${range === 'today' || range === '30d' ? 'max-w-4' : 'max-w-10'} ${hoveredPoint?.key === point.key ? 'ring-2 ring-blue-200 dark:ring-blue-700' : ''}`}
-                                                style={{ height: `${height}%` }}
+                                                className={`shrink-0 bg-gradient-to-t from-blue-500 to-cyan-400 transition-[filter,opacity] duration-150 group-hover:brightness-95 ${isEmpty ? 'rounded-none opacity-20' : 'rounded-t-[3px]'} ${hoveredPoint?.key === point.key ? 'brightness-95' : ''}`}
+                                                style={{
+                                                    width: '70%',
+                                                    maxWidth: `${chartBarMaxWidth[range]}px`,
+                                                    height: isEmpty ? '2px' : `${height}%`,
+                                                }}
                                                 title={`${point.label}: ${formatTokens(point.total_tokens)} Token · 输入 ${formatTokens(point.input_tokens)} · 输出 ${formatTokens(point.output_tokens)} · 缓存 ${formatTokens(point.cached_tokens)} · ${formatTokens(point.request_count)} 次请求`}
                                             />
                                         </div>
-                                        <span className="text-[10px] text-gray-400 dark:text-gray-500">{showPointLabel ? point.label : '\u00a0'}</span>
+                                        <span className="w-full whitespace-nowrap text-center text-[10px] text-gray-400 dark:text-gray-500">{showPointLabel ? point.label : '\u00a0'}</span>
                                     </div>
                                 );
                             })}
                         </div>
                     </section>
 
-                    <section className="rounded-2xl border border-gray-100 bg-white p-4 shadow-sm dark:border-base-200 dark:bg-base-100">
-                        <div className="mb-3 flex items-center justify-between">
+                    <section className="rounded-2xl border border-gray-100 bg-white p-3 shadow-sm dark:border-base-200 dark:bg-base-100 lg:flex lg:min-h-0 lg:flex-col">
+                        <div className="mb-1.5 flex items-center justify-between">
                             <div>
                                 <h2 className="flex items-center gap-2 text-sm font-semibold text-gray-900 dark:text-base-content">
                                     <Cpu className="h-4 w-4 text-purple-500" />
@@ -477,18 +490,18 @@ function Dashboard() {
                                 <p className="mt-0.5 text-[11px] text-gray-400 dark:text-gray-500">{rangeLabels[range]}本地记录</p>
                             </div>
                         </div>
-                        <div className="max-h-36 space-y-2 overflow-y-auto pr-1">
+                        <div className="max-h-36 space-y-1.5 overflow-y-auto pr-1 lg:min-h-0 lg:flex-1 lg:max-h-none">
                             {modelsForRange.slice(0, 8).map((model) => {
                                 const width = totals.total_tokens
                                     ? Math.max((model.total_tokens / totals.total_tokens) * 100, 2)
                                     : 0;
                                 return (
                                     <div key={model.model}>
-                                        <div className="mb-1 flex items-center justify-between gap-3 text-xs">
+                                        <div className="mb-0.5 flex items-center justify-between gap-3 text-[11px]">
                                             <span className="truncate text-gray-600 dark:text-gray-300" title={model.model}>{model.model}</span>
                                             <span className="shrink-0 font-mono text-gray-500 dark:text-gray-400">{compactTokens(model.total_tokens)}</span>
                                         </div>
-                                        <div className="h-1.5 overflow-hidden rounded-full bg-gray-100 dark:bg-base-200">
+                                        <div className="h-1 overflow-hidden rounded-full bg-gray-100 dark:bg-base-200">
                                             <div className="h-full rounded-full bg-purple-400" style={{ width: `${width}%` }} />
                                         </div>
                                     </div>
@@ -501,8 +514,8 @@ function Dashboard() {
                     </section>
                 </div>
 
-                <section className="overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-sm dark:border-base-200 dark:bg-base-100">
-                    <div className="flex items-center justify-between border-b border-gray-100 px-4 py-3 dark:border-base-200">
+                <section className="overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-sm dark:border-base-200 dark:bg-base-100 lg:flex lg:min-h-0 lg:flex-1 lg:flex-col">
+                    <div className="flex shrink-0 items-center justify-between border-b border-gray-100 px-4 py-2 dark:border-base-200">
                         <div>
                             <h2 className="flex items-center gap-2 text-sm font-semibold text-gray-900 dark:text-base-content">
                                 <Cpu className="h-4 w-4 text-blue-500" />
@@ -512,26 +525,26 @@ function Dashboard() {
                         </div>
                         <span className="text-[11px] text-gray-400 dark:text-gray-500">{modelsForRange.length} 个模型</span>
                     </div>
-                    <div className="max-h-32 overflow-y-auto">
+                    <div className="max-h-[142px] overflow-y-auto lg:min-h-0 lg:flex-1 lg:max-h-none">
                         <div className="overflow-x-auto">
                             <table className="w-full min-w-[560px] text-left text-xs">
                                 <thead className="bg-gray-50 text-[10px] uppercase text-gray-500 dark:bg-base-200/60 dark:text-gray-400">
                                     <tr>
-                                        <th className="px-4 py-2 font-medium">模型</th>
-                                        <th className="px-4 py-2 text-right font-medium">总 Token</th>
-                                        <th className="px-4 py-2 text-right font-medium">输入</th>
-                                        <th className="px-4 py-2 text-right font-medium">输出</th>
-                                        <th className="px-4 py-2 text-right font-medium">请求</th>
+                                        <th className="px-4 py-1.5 font-medium">模型</th>
+                                        <th className="px-4 py-1.5 text-right font-medium">总 Token</th>
+                                        <th className="px-4 py-1.5 text-right font-medium">输入</th>
+                                        <th className="px-4 py-1.5 text-right font-medium">输出</th>
+                                        <th className="px-4 py-1.5 text-right font-medium">请求</th>
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-gray-100 dark:divide-base-200">
                                     {modelsForRange.map((model) => (
                                         <tr key={model.model} className="text-gray-700 dark:text-gray-300">
-                                            <td className="max-w-[320px] truncate px-4 py-2 font-medium" title={model.model}>{model.model}</td>
-                                            <td className="px-4 py-2 text-right font-mono">{formatTokens(model.total_tokens)}</td>
-                                            <td className="px-4 py-2 text-right font-mono text-indigo-500">{formatTokens(model.input_tokens)}</td>
-                                            <td className="px-4 py-2 text-right font-mono text-purple-500">{formatTokens(model.output_tokens)}</td>
-                                            <td className="px-4 py-2 text-right font-mono">{formatTokens(model.request_count)}</td>
+                                            <td className="max-w-[320px] truncate px-4 py-1.5 font-medium" title={model.model}>{model.model}</td>
+                                            <td className="px-4 py-1.5 text-right font-mono">{formatTokens(model.total_tokens)}</td>
+                                            <td className="px-4 py-1.5 text-right font-mono text-indigo-500">{formatTokens(model.input_tokens)}</td>
+                                            <td className="px-4 py-1.5 text-right font-mono text-purple-500">{formatTokens(model.output_tokens)}</td>
+                                            <td className="px-4 py-1.5 text-right font-mono">{formatTokens(model.request_count)}</td>
                                         </tr>
                                     ))}
                                 </tbody>

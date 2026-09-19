@@ -1,5 +1,8 @@
 # Antigravity Tools Lite
 
+> 社区友链：[LINUX DO](https://linux.do/)
+
+
 一个面向个人使用的轻量版 Antigravity 账号管理与本地用量仪表盘。
 
 这个版本保留最核心的三件事：管理多个 Google 账号、在 Antigravity 中切换账号、读取本机对话记录统计 Token 用量。桌面版不暴露也不自动启动 API 反代、管理后台、代理调度器、广告入口或推广链接。

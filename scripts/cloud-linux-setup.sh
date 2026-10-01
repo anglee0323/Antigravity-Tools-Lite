@@ -1,0 +1,105 @@
+#!/usr/bin/env bash
+# Rootless, workspace-local Debian 13 x86-64 build dependencies.
+# All Debian packages are authenticated by apt, then EXTRACTED (never installed).
+set -euo pipefail
+root="${ANTIGRAVITY_BUILD_ENV:-/workspace/shared/antigravity-build-env}"
+snapshot="${DEBIAN_SNAPSHOT:-20260828T000000Z}"
+toolchain="${ANTIGRAVITY_TOOLCHAIN_ROOT:-$root/toolchain}"
+rust_version="${RUST_VERSION:-1.99.0}"
+node_version="${NODE_VERSION:-24.19.0}"
+# Provision from a fresh shell so extracting libraries cannot replace a library
+# currently loaded by this setup process. Never rerun while another build runs.
+if [[ "${LD_LIBRARY_PATH:-}" == *"$root/sysroot"* ]]; then
+  echo 'Run setup from a fresh shell without sourcing env.sh first, and stop other builds.' >&2; exit 1
+fi
+source /etc/os-release
+[[ "$ID" == debian && "$VERSION_ID" == 13 && "$(uname -m)" == x86_64 ]] || {
+  echo 'This rootless sysroot is for Debian 13 x86-64 only. Use scripts/build-linux-deb.sh --docker on other hosts.' >&2; exit 1;
+}
+for tool in /usr/bin/apt-get dpkg-deb curl tar sha256sum gcc g++ make pkg-config; do
+  command -v "$tool" >/dev/null || { echo "Required host tool missing: $tool" >&2; exit 1; }
+done
+mkdir -p "$root"/{apt/lists/partial,apt/archives/partial,apt/empty,sysroot,logs,downloads,bin} "$toolchain"
+# Rootless apt deliberately uses its own empty status, lists and archive directories.
+touch "$root/apt/status"
+cat > "$root/apt/sources.list" <<SOURCES
+deb [signed-by=/usr/share/keyrings/debian-archive-keyring.gpg check-valid-until=no] https://snapshot.debian.org/archive/debian/$snapshot/ trixie main
+deb [signed-by=/usr/share/keyrings/debian-archive-keyring.gpg check-valid-until=no] https://snapshot.debian.org/archive/debian/$snapshot/ trixie-updates main
+deb [signed-by=/usr/share/keyrings/debian-archive-keyring.gpg check-valid-until=no] https://snapshot.debian.org/archive/debian-security/$snapshot/ trixie-security main
+SOURCES
+cat > "$root/apt/apt.conf" <<CONFIG
+Dir::Etc::parts "$root/apt/empty";
+Dir::Etc::main "-";
+Dir::Etc::sourcelist "$root/apt/sources.list";
+Dir::Etc::sourceparts "$root/apt/empty";
+Dir::State "$root/apt";
+Dir::State::status "$root/apt/status";
+Dir::Cache "$root/apt";
+Dir::Log "$root/logs";
+APT::Architecture "amd64";
+Acquire::Languages "none";
+Acquire::Retries "2";
+CONFIG
+export APT_CONFIG="$root/apt/apt.conf"
+/usr/bin/apt-get update
+/usr/bin/apt-get --assume-yes --download-only --no-install-recommends install \
+  libwebkit2gtk-4.1-dev libgtk-3-dev libayatana-appindicator3-dev librsvg2-dev \
+  libxdo-dev libssl-dev patchelf cmake clang libclang-dev pkg-config dbus-x11 gnome-keyring
+# dpkg-deb --extract does not run package maintainer scripts or enable services.
+(cd "$root/apt/archives" && sha256sum ./*.deb) > "$root/debian-packages.next.sha256"
+if [[ ! -r "$root/debian-packages.sha256" ]] || ! cmp -s "$root/debian-packages.next.sha256" "$root/debian-packages.sha256" || [[ ! -f "$root/sysroot/usr/lib/x86_64-linux-gnu/pkgconfig/webkit2gtk-4.1.pc" ]]; then
+  for package in "$root"/apt/archives/*.deb; do dpkg-deb --extract "$package" "$root/sysroot"; done
+fi
+mv "$root/debian-packages.next.sha256" "$root/debian-packages.sha256"
+for package in "$root"/apt/archives/*.deb; do
+  dpkg-deb --field "$package" Package Version Architecture | tr '\n' ' '; echo
+done > "$root/debian-packages.txt"
+unset APT_CONFIG
+export CARGO_HOME="$toolchain/cargo" RUSTUP_HOME="$toolchain/rustup"
+if [[ ! -x "$CARGO_HOME/bin/rustup" ]]; then
+  curl --proto '=https' --tlsv1.2 -fsSL https://sh.rustup.rs -o "$root/downloads/rustup-init.sh"
+  sh "$root/downloads/rustup-init.sh" -y --profile minimal --default-toolchain "$rust_version" --no-modify-path
+elif ! "$CARGO_HOME/bin/rustc" --version | grep -q "rustc $rust_version "; then
+  "$CARGO_HOME/bin/rustup" toolchain install "$rust_version" --profile minimal --component rustfmt
+fi
+# Keep a known existing compiler without installing an identical toolchain twice.
+if "$CARGO_HOME/bin/rustc" --version | grep -q "rustc $rust_version "; then
+  selected_toolchain="$("$CARGO_HOME/bin/rustup" show active-toolchain | awk '{print $1}')"
+else
+  selected_toolchain="$rust_version"
+fi
+if ! command -v node >/dev/null || [[ "$(node --version)" != "v$node_version" ]]; then
+  archive="node-v$node_version-linux-x64.tar.xz"
+  curl --proto '=https' --tlsv1.2 -fsSL "https://nodejs.org/dist/v$node_version/$archive" -o "$root/downloads/$archive"
+  curl --proto '=https' --tlsv1.2 -fsSL "https://nodejs.org/dist/v$node_version/SHASUMS256.txt" -o "$root/downloads/SHASUMS256.txt"
+  (cd "$root/downloads"; awk -v file="$archive" '$2 == file' SHASUMS256.txt | sha256sum -c -)
+  mkdir -p "$root/node"
+  tar -xJf "$root/downloads/$archive" -C "$root/node" --strip-components=1
+fi
+# Select only build tools from the sysroot, not its shell/system utilities.
+for tool in cmake clang clang++ patchelf gdbus gnome-keyring-daemon; do ln -sfn "$root/sysroot/usr/bin/$tool" "$root/bin/$tool"; done
+cat > "$root/env.sh" <<ENV
+# Generated by cloud-linux-setup.sh; source this in each build shell.
+export ANTIGRAVITY_BUILD_ENV="$root"
+export ANTIGRAVITY_RUST_VERSION="$rust_version"
+export ANTIGRAVITY_NODE_VERSION="$node_version"
+export CARGO_HOME="$CARGO_HOME"
+export RUSTUP_HOME="$RUSTUP_HOME"
+export RUSTUP_TOOLCHAIN="$selected_toolchain"
+export PATH="$root/bin:$root/node/bin:$CARGO_HOME/bin:\$PATH"
+export PKG_CONFIG_SYSROOT_DIR="$root/sysroot"
+export PKG_CONFIG_LIBDIR="$root/sysroot/usr/lib/x86_64-linux-gnu/pkgconfig:$root/sysroot/usr/lib/pkgconfig:$root/sysroot/usr/share/pkgconfig"
+export LIBRARY_PATH="$root/sysroot/usr/lib/x86_64-linux-gnu\${LIBRARY_PATH:+:\$LIBRARY_PATH}"
+export LD_LIBRARY_PATH="$root/sysroot/usr/lib/x86_64-linux-gnu:$root/sysroot/usr/lib/llvm-19/lib\${LD_LIBRARY_PATH:+:\$LD_LIBRARY_PATH}"
+export LIBCLANG_PATH="$root/sysroot/usr/lib/llvm-19/lib"
+export CARGO_BUILD_JOBS="\${CARGO_BUILD_JOBS:-3}"
+export npm_config_cache="$root/npm-cache"
+ENV
+source "$root/env.sh"
+{
+  date -u '+%Y-%m-%dT%H:%M:%SZ'; uname -m; cat /etc/os-release
+  rustc --version; cargo --version; node --version; npm --version
+  gcc --version | head -n1; cmake --version | head -n1; clang --version | head -n1
+  pkg-config --modversion glib-2.0 gtk+-3.0 webkit2gtk-4.1 ayatana-appindicator3-0.1
+} | tee "$root/versions.txt"
+printf '\nBuild environment ready. Run: source %q/env.sh\n' "$root"

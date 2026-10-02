@@ -22,7 +22,7 @@ There is no DMG, Intel macOS Homebrew cask, Linux Homebrew formula or standalone
 
 The release also includes `release-manifest.json` recording the source commit and hashes of all seven package/checksum/cask assets. All platform builds pass `--locked`. Package generation and synthetic CLI checks occur before the publishing job receives repository write permission.
 
-PRs that change release inputs run the same three package jobs and local asset verification without creating a tag or release. The publish job is explicitly disabled for PR events. Linux smoke runs the executable extracted from the actual `.deb`; the macOS job checks `CFBundleExecutable` against the cask path before packaging.
+PRs that change release inputs run the same three package jobs and local asset verification without creating a tag or release. The publish job is explicitly disabled for PR events. Linux smoke runs the executable extracted from the actual `.deb`; the macOS job checks `CFBundleExecutable` against the cask path before packaging. It explicitly asks Tauri for a complete ad-hoc bundle signature (`APPLE_SIGNING_IDENTITY=-`). Before executing CLI smoke tests, and again after extracting the final ZIP, `scripts/verify-macos-bundle.mjs` requires the expected bundle ID/version/executable, arm64 architecture, nonempty icon and resource seal, and successful `codesign --verify --deep --strict`. Any failure stops the package job before upload/publication. The Mac regression tests create disposable Mach-O fixtures and never launch them.
 
 ## Signing and source checks
 
@@ -49,3 +49,11 @@ agy-lite --help
 ```
 
 Publish these commands together with the real root-level cask and its current acceptance limits. Do not describe pending native installation as tested. Update the signing wording only if the actual final release is signed/notarized.
+
+## macOS signature integrity is separate from platform trust
+
+The 4.7.7 Mac ZIP shipped only a linker-generated ad-hoc executable signature without a complete bundle resource seal. Its checksum can match while macOS rejects the bundle as damaged. Do not repair an installed/downloaded copy or remove quarantine as a release fix. Build a new patch release with the corrected signing step and verify the actual ZIP after extraction. Preserve existing public tags/assets and regenerate the new checksum, manifest and cask through the release workflow.
+
+A complete ad-hoc signature verifies bundle integrity but does not identify a developer, provide Apple notarization, or establish Gatekeeper acceptance. Normal trusted distribution requires an authorized Developer ID Application signing identity, the associated private key made available securely to the signing runner, and Apple notarization/stapling. Those credentials are not created or configured by this fix. See [Tauri macOS signing](https://v2.tauri.app/distribute/sign/macos/).
+
+The direct ZIP/Homebrew distribution uses an empty entitlements dictionary. App Sandbox is incompatible with its existing configuration/session files, LaunchAgent registration and external-client process integration; the signed payload must not enable it. Regression fixtures sign with the actual production entitlements, and the final bundle verifier rejects sandbox or any unexpected signed entitlement. This build configuration change does not modify macOS Gatekeeper or grant OS privacy permissions.

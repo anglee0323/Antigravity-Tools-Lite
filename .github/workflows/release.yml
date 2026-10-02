@@ -10,6 +10,8 @@ on:
       - scripts/release-assets.mjs
       - scripts/publish-release.mjs
       - scripts/test-release.mjs
+      - scripts/verify-macos-bundle.mjs
+      - scripts/test-macos-bundle.mjs
       - docs/release-notes/**
       - scripts/generate-homebrew.mjs
       - scripts/build-linux-deb.sh
@@ -19,6 +21,7 @@ on:
       - src-tauri/Cargo.toml
       - src-tauri/Cargo.lock
       - src-tauri/tauri*.json
+      - src-tauri/Entitlements.plist
   workflow_dispatch:
     inputs:
       tag:
@@ -207,7 +210,12 @@ jobs:
         run: node scripts/release-assets.mjs source "$RELEASE_TAG"
       - name: Install frontend dependencies
         run: npm ci
-      - name: Build app bundle
+      - name: Test macOS signature integrity gates
+        run: node --test scripts/test-macos-bundle.mjs
+      - name: Build complete ad-hoc signed app bundle
+        env:
+          # Complete bundle sealing; not Developer ID signing or notarization.
+          APPLE_SIGNING_IDENTITY: "-"
         run: npm run tauri build -- --target aarch64-apple-darwin --bundles app -- --locked
       - name: Verify and stage app bundle and cask
         env:
@@ -220,11 +228,15 @@ jobs:
           [[ "$EXECUTABLE" == "antigravity-tools" ]]
           [[ -x "$APP/Contents/MacOS/$EXECUTABLE" ]]
           [[ "$(lipo -archs "$APP/Contents/MacOS/antigravity-tools")" == "arm64" ]]
+          node scripts/verify-macos-bundle.mjs "$APP" "$VERSION"
           [[ "$("$APP/Contents/MacOS/antigravity-tools" --version)" == "agy-lite $VERSION" ]]
           node scripts/test-cli.mjs "$APP/Contents/MacOS/antigravity-tools"
           mkdir -p artifacts/release
           NAME="Antigravity-Tools-Lite-${VERSION}-macos-arm64.zip"
           ditto -c -k --sequesterRsrc --keepParent "$APP" "artifacts/release/$NAME"
+          ROUNDTRIP="$(mktemp -d "$RUNNER_TEMP/agy-macos-archive.XXXXXX")"
+          ditto -x -k "artifacts/release/$NAME" "$ROUNDTRIP"
+          node scripts/verify-macos-bundle.mjs "$ROUNDTRIP/Antigravity Tools Lite.app" "$VERSION"
           node scripts/release-assets.mjs checksum "artifacts/release/$NAME"
           node scripts/generate-homebrew.mjs --archive "artifacts/release/$NAME" \
             --url "https://github.com/${GITHUB_REPOSITORY}/releases/download/${RELEASE_TAG}/${NAME}" \

@@ -2,9 +2,9 @@
 
 ## Status
 
-This repository contains the **macOS Apple Silicon cask** at `Casks/antigravity-tools-lite.rb`, backed by the public [v4.7.7 release](https://github.com/anglee0323/antigravity-tools-lite/releases/tag/v4.7.7). It uses this repository as an explicit-URL tap; no separate tap repository is required. v4.7.6 predates the management CLI.
+This repository contains the **macOS Apple Silicon cask** at `Casks/antigravity-tools-lite.rb`, backed by the public [v4.7.8 release](https://github.com/anglee0323/antigravity-tools-lite/releases/tag/v4.7.8). It uses this repository as an explicit-URL tap; no separate tap repository is required. v4.7.6 predates the management CLI.
 
-The public ZIP, checksums, generated cask and source manifest were downloaded and compared with GitHub's asset digests. The ZIP's executable is ARM64 and reports bundle version 4.7.7; its path matches the `binary` stanza. The root cask is byte-for-byte identical to the release attachment, with ZIP SHA-256 `ecb686028b5a565b7bdec4a610cb1ee1eb19191b0882c8e72bd4808cca2a5b70`. The Homebrew recipe check loads the DSL and fetches/verifies the archive without installing or launching the app.
+The public ZIP, checksums, generated cask and source manifest were downloaded and compared with GitHub's asset digests. The ZIP's executable is ARM64 and reports bundle version 4.7.8; its path matches the `binary` stanza. The root cask is byte-for-byte identical to the release attachment, with ZIP SHA-256 `8f1d54072d6784fffe4ea82425bd087f0fd2f7c267659be73e1b02505e82f50d`. The Homebrew recipe check loads the DSL and fetches/verifies the archive without installing or launching the app.
 
 **Native installation acceptance is pending.** Installation, upgrade, uninstall/account preservation, custom `--appdir` behavior and Gatekeeper acceptance have not yet been tested on a user's Mac. Recipe and package validation do not establish these results. The installation commands below are provided with that limitation; no security checks are disabled.
 
@@ -53,11 +53,11 @@ Review any Homebrew trust prompt yourself. `brew uninstall` retains saved accoun
 
 ## Signing and Gatekeeper
 
-The existing release workflow does not configure Developer ID signing/notarization. This change does not claim notarized binaries or disable quarantine/Gatekeeper. Homebrew installation does not remove that limitation. A distributable release needs appropriate signing/notarization or clearly documented user review of the unsigned app; do not add quarantine-removal commands to the cask. Confirm Apple trust behavior on a clean Mac before promoting installation instructions.
+The v4.7.8 release uses complete ad-hoc bundle signing. The downloaded public ZIP passes strict signature verification with empty entitlements. The release workflow does not configure Developer ID signing/notarization and does not disable quarantine/Gatekeeper. Homebrew installation does not remove that limitation. A distributable release needs appropriate signing/notarization or clearly documented user review of the ad-hoc signed app; do not add quarantine-removal commands to the cask. Confirm Apple trust behavior on a clean Mac before promoting installation instructions.
 
 ## Publish the cask in this repository
 
-A separate `homebrew-*` repository is optional. Homebrew's [two-argument tap form](https://docs.brew.sh/Taps) supports this existing Git repository. The root `Casks/antigravity-tools-lite.rb` is the exact generated v4.7.7 release attachment, with its immutable archive URL and real SHA-256. A release attachment alone is not a tap entry.
+A separate `homebrew-*` repository is optional. Homebrew's [two-argument tap form](https://docs.brew.sh/Taps) supports this existing Git repository. The root `Casks/antigravity-tools-lite.rb` is the exact generated v4.7.8 release attachment, with its immutable archive URL and real SHA-256. A release attachment alone is not a tap entry.
 
 Install from the repository with:
 

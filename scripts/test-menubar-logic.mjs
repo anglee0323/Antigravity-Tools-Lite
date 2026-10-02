@@ -15,6 +15,7 @@ const source = ts.transpileModule(
 ).outputText;
 const {
   compactQuotaGroups,
+  observedPercentage,
   validPercentage,
   lowestKnownQuota,
   isAccountSwitchable,
@@ -40,6 +41,22 @@ test("unknown percentages remain unknown", () => {
     assert.equal(validPercentage(value), null);
 });
 test("zero is a real known quota", () => assert.equal(validPercentage(0), 0));
+test("missing observations and legacy ambiguous zeros are not exhausted", () => {
+  assert.equal(observedPercentage(0), null);
+  assert.equal(observedPercentage(0, false), null);
+  assert.equal(observedPercentage(0, true), 0);
+  assert.equal(observedPercentage(70, false), null);
+});
+test("read-only model fractions retain precision through legacy truncation/rounding", () => {
+  for (const fraction of [0.009, 0.004]) {
+    for (const percentage of [Math.trunc(fraction*100), Math.round(fraction*100)]) {
+      const remaining = compactQuotaGroups({models:[{name:"model",percentage,percentage_known:true,observed_remaining_fraction:fraction,reset_time:""} ]})[0].rows[0].remaining;
+      assert.ok(Math.abs(remaining-fraction*100)<1e-12);
+      assert.ok(remaining>0);
+    }
+  }
+  assert.equal(compactQuotaGroups({models:[{name:"legacy",percentage:0,percentage_known:true,reset_time:""}]})[0].rows[0].remaining,null);
+});
 test("fraction must lie within its actual range", () => {
   assert.equal(validPercentage(0.42, true), 42);
   assert.equal(validPercentage(1.2, true), null);
@@ -206,12 +223,14 @@ const quotaAccount = (id, session = 0.8, weekly = 0.6) => ({
             bucket_id: "session",
             window: "5h",
             remaining_fraction: session,
+            remaining_fraction_known: true,
             reset_time: "2026-10-01T16:00:00Z",
           },
           {
             bucket_id: "week",
             window: "weekly",
             remaining_fraction: weekly,
+            remaining_fraction_known: true,
             reset_time: "2026-10-07T12:00:00Z",
           },
         ],

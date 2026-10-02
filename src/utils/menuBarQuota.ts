@@ -21,6 +21,14 @@ export function validPercentage(
   return scaled >= 0 && scaled <= 100 ? Math.round(scaled) : null;
 }
 
+/** Legacy zeros are ambiguous: previous parsers substituted zero for missing API data. */
+export function observedPercentage(value: unknown, known?: boolean, fraction = false): number | null {
+  if (known === false || (known === undefined && value === 0)) return null;
+  if (typeof value !== "number" || !Number.isFinite(value)) return null;
+  const scaled = fraction ? value * 100 : value;
+  return scaled >= 0 && scaled <= 100 ? scaled : null;
+}
+
 /** Independent pools stay independent. Unknown data never becomes an empty bar. */
 export function compactQuotaGroups(
   quota?: QuotaData,
@@ -35,7 +43,7 @@ export function compactQuotaGroups(
         id: `${groupIndex}-${bucket.bucket_id || index}`,
         label: bucket.display_name || bucket.window,
         window: bucket.window,
-        remaining: validPercentage(bucket.remaining_fraction, true),
+        remaining: observedPercentage(bucket.remaining_fraction, bucket.remaining_fraction_known, true),
         resetTime: bucket.reset_time,
       })),
     }));
@@ -50,7 +58,9 @@ export function compactQuotaGroups(
       {
         id: model.name,
         label: model.display_name || model.name,
-        remaining: validPercentage(model.percentage),
+        remaining: model.observed_remaining_fraction !== undefined
+          ? observedPercentage(model.observed_remaining_fraction, model.percentage_known, true)
+          : observedPercentage(model.percentage, model.percentage === 0 ? undefined : model.percentage_known),
         resetTime: model.reset_time,
       },
     ],

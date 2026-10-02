@@ -10,6 +10,15 @@ pub async fn list_accounts() -> Result<Vec<Account>, String> {
         .unwrap_or_else(|_| Err("Task panicked".to_string()))
 }
 
+/// Read-only, credential-free account dashboard with explicit index/read counts.
+#[tauri::command]
+pub async fn get_account_dashboard_snapshot(
+) -> Result<modules::account_dashboard::DashboardSnapshot, String> {
+    tokio::task::spawn_blocking(modules::account_dashboard::snapshot)
+        .await
+        .map_err(|_| "dashboard_task_failed".to_string())?
+}
+
 /// 添加账号
 #[tauri::command]
 pub async fn add_account(

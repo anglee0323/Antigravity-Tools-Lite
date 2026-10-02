@@ -40,6 +40,10 @@ export interface QuotaData {
 export interface ModelQuota {
     name: string;
     percentage: number;
+    percentage_known?: boolean;
+    /** Existing fusion inference, not a verified API model-to-pool relationship. */
+    quota_bucket_id?: string;
+    observed_remaining_fraction?: number;
     reset_time: string;
     display_name?: string;
     supports_images?: boolean;
@@ -56,6 +60,7 @@ export interface QuotaBucket {
     bucket_id: string;
     window: string;  // "weekly" | "5h"
     remaining_fraction: number;
+    remaining_fraction_known?: boolean;
     reset_time: string;
     display_name?: string;
     description?: string;

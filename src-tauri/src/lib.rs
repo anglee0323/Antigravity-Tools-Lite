@@ -293,6 +293,7 @@ pub fn run() {
             modules::desktop::hide_menu_bar_dashboard,
             modules::desktop::quit_app,
             commands::list_accounts,
+            commands::get_account_dashboard_snapshot,
             commands::add_account,
             commands::delete_account,
             commands::delete_accounts,

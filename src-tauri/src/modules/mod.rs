@@ -1,4 +1,5 @@
 pub mod account;
+pub mod account_dashboard;
 pub mod account_service;
 pub mod api_pricing;
 pub mod app_localization;

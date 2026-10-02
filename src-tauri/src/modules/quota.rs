@@ -362,6 +362,12 @@ pub async fn fetch_quota_with_cache(
                                 let model_quota = crate::models::quota::ModelQuota {
                                     name,
                                     percentage,
+                                    percentage_known: Some(
+                                        crate::models::quota::fraction_is_known(quota_info.remaining_fraction),
+                                    ),
+                                    observed_remaining_fraction: quota_info.remaining_fraction
+                                        .filter(|f| crate::models::quota::fraction_is_known(Some(*f))),
+                                    quota_bucket_id: None,
                                     reset_time,
                                     display_name: info.display_name,
                                     supports_images: info.supports_images,
@@ -436,6 +442,12 @@ pub async fn fetch_quota_with_cache(
                                     if let Some(b) = target_bucket {
                                         model.percentage =
                                             (b.remaining_fraction * 100.0).round() as i32;
+                                        model.percentage_known = b.remaining_fraction_known;
+                                        model.observed_remaining_fraction =
+                                            (b.remaining_fraction_known == Some(true))
+                                                .then_some(b.remaining_fraction);
+                                        model.quota_bucket_id = (!b.bucket_id.is_empty())
+                                            .then(|| b.bucket_id.clone());
                                         if !b.reset_time.is_empty() {
                                             model.reset_time = b.reset_time.clone();
                                         }
@@ -533,6 +545,9 @@ async fn fetch_quota_summary(
                                 bucket_id: b.bucket_id.unwrap_or_default(),
                                 window: b.window.unwrap_or_default(),
                                 remaining_fraction: b.remaining_fraction.unwrap_or(0.0),
+                                remaining_fraction_known: Some(
+                                    crate::models::quota::fraction_is_known(b.remaining_fraction),
+                                ),
                                 reset_time: b.reset_time.unwrap_or_default(),
                                 display_name: b.display_name,
                                 description: b.description,

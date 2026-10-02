@@ -9,6 +9,9 @@ pub struct QuotaBucket {
     pub window: String,
     /// 剩余比例 0.0-1.0
     pub remaining_fraction: f64,
+    /// None: legacy cache; false: API omitted/invalid value. Used by read-only views.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub remaining_fraction_known: Option<bool>,
     /// 重置时间 (RFC3339)
     pub reset_time: String,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -30,7 +33,15 @@ pub struct QuotaGroup {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ModelQuota {
     pub name: String,
-    pub percentage: i32, // 剩余百分比 0-100
+    pub percentage: i32, // Legacy policy value; read-only views must consult percentage_known.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub percentage_known: Option<bool>,
+    /// Exact valid API observation for read-only views; never used by policy.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub observed_remaining_fraction: Option<f64>,
+    /// Bucket association inferred by the existing fusion rule, not an API pool ID.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub quota_bucket_id: Option<String>,
     pub reset_time: String,
 
     // -- 动态参数解析与持久化 --
@@ -95,4 +106,8 @@ impl Default for QuotaData {
     fn default() -> Self {
         Self::new()
     }
+}
+
+pub fn fraction_is_known(value: Option<f64>) -> bool {
+    value.is_some_and(|v| v.is_finite() && (0.0..=1.0).contains(&v))
 }

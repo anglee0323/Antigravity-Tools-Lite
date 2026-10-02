@@ -1,6 +1,7 @@
 import i18n from '../i18n';
 import { Account, QuotaData } from '../types/account';
 import { request as invoke } from '../utils/request';
+import type { DashboardSnapshot } from '../utils/accountDashboard';
 
 // 检查环境 (可选)
 function ensureTauriEnvironment() {
@@ -18,6 +19,11 @@ export async function listAccounts(): Promise<Account[]> {
     }
     // 否则直接返回响应内容（假设为数组）
     return response || [];
+}
+
+/** Read-only account-index snapshot; does not refresh, switch, repair or return tokens. */
+export async function getAccountDashboardSnapshot(): Promise<DashboardSnapshot> {
+    return await invoke<DashboardSnapshot>('get_account_dashboard_snapshot');
 }
 
 export async function getCurrentAccount(): Promise<Account | null> {

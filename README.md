@@ -31,6 +31,8 @@ Native Linux Tauri/WebKitGTK viewport, CI debug build `6896ce61`, English UI and
 
 The release workflow does not configure Developer ID signing/notarization or Windows Authenticode signing. macOS or Windows may therefore warn about or block a downloaded package. Check its release source and checksum, and make any required trust decision yourself through the operating system's normal review flow. See [Apple's guidance](https://support.apple.com/en-gb/102445) and [Microsoft's app-reputation guidance](https://learn.microsoft.com/en-us/windows/apps/package-and-deploy/smartscreen-reputation). Homebrew does not remove these platform checks
 
+**macOS 4.7.7 repair:** If the 4.7.7 download is reported as damaged, use the corrected 4.7.8 release when available and keep your previous app and account data. 4.7.8 repairs the bundle signature and direct-distribution entitlements; its complete ad-hoc signature is not Developer ID signing or Apple notarization. Gatekeeper and native GUI acceptance remain incomplete. The Homebrew cask needs a separate update to the verified new release asset.
+
 ## Account management
 
 The **+** button offers three ways to add an account

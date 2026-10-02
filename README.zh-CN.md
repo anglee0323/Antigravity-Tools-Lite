@@ -31,6 +31,8 @@ Linux 真实 Tauri/WebKitGTK 视口，CI 调试构建 `6896ce61`，英文界面�
 
 当前发布流程没有配置 Developer ID 签名/公证或 Windows Authenticode 签名，系统可能提示或阻止运行下载的安装包。请先核对发布来源和校验值，再通过系统正常的审核流程自行决定是否信任。参见 [Apple 官方说明](https://support.apple.com/en-gb/102445)和 [Microsoft 应用信誉说明](https://learn.microsoft.com/en-us/windows/apps/package-and-deploy/smartscreen-reputation)。Homebrew 安装不会取消这些系统检查
 
+**macOS 4.7.7 修复提示：** 如果下载的 4.7.7 提示「已损坏」，请在修正版 4.7.8 发布后升级，并保留旧 APP 和账号数据。4.7.8 修复应用包签名与直接发行版权限配置；完整 ad-hoc 签名不等于 Developer ID 签名或 Apple 公证，Gatekeeper 和原生 GUI 验收仍未完成。Homebrew 配方还需单独更新为已核验的新发布资产。
+
 ## 账号管理
 
 点击 **+** 按钮添加账号，提供三种方式

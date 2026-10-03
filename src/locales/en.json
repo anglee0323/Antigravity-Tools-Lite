@@ -356,5 +356,26 @@
       "operation_superseded": "A newer setting replaced this request. Check the current status."
     },
     "translated": "{{count}} static labels currently translated"
+  },
+  "updater": {
+    "title": "Software Updates",
+    "desc": "Check for new releases on GitHub and update with one-click download and restart.",
+    "check_now": "Check for Updates",
+    "checking": "Checking...",
+    "current_version": "Current Version",
+    "last_checked": "Last checked",
+    "view_all_releases": "View all releases",
+    "new_version_available": "New Version Available",
+    "up_to_date": "Up to Date",
+    "already_latest": "You are running the latest version",
+    "version_tag": "Current version: v{{version}}",
+    "release_notes": "Release Notes",
+    "no_release_notes": "No detailed release notes available.",
+    "downloading": "Downloading installer...",
+    "view_on_github": "View on GitHub",
+    "later": "Remind Me Later",
+    "update_now": "Download & Restart to Update",
+    "updating": "Updating...",
+    "check_failed": "Failed to check for updates: {{error}}"
   }
 }

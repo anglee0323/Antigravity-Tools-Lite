@@ -516,3 +516,19 @@ pub async fn get_local_token_usage(
 pub async fn get_api_pricing() -> Result<crate::modules::api_pricing::ApiPricingSnapshot, String> {
     crate::modules::api_pricing::get_api_pricing().await
 }
+
+/// 检查 GitHub Releases 获取最新版本信息
+#[tauri::command]
+pub async fn check_for_updates() -> Result<crate::modules::updater::UpdateInfo, String> {
+    crate::modules::updater::check_for_updates().await
+}
+
+/// 下载最新安装包并启动更新安装 / 重启
+#[tauri::command]
+pub async fn download_and_install_update(
+    app: tauri::AppHandle,
+    download_url: String,
+    asset_name: String,
+) -> Result<String, String> {
+    crate::modules::updater::download_and_install_update(app, download_url, asset_name).await
+}

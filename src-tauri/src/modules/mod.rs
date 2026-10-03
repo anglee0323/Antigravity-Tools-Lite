@@ -34,3 +34,4 @@ pub use quota::*;
 
 pub mod desktop;
 pub mod auto_switch;
+pub mod updater;

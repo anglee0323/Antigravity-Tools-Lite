@@ -12,6 +12,8 @@ import { useAccountStore } from './stores/useAccountStore';
 import { useTranslation } from 'react-i18next';
 import { listen } from '@tauri-apps/api/event';
 import { isTauri } from './utils/env';
+import UpdateDialog from './components/updater/UpdateDialog';
+import { useUpdateStore } from './stores/useUpdateStore';
 
 const router = createBrowserRouter([
   { path: "/menubar", element: <MenuBarDashboard /> },
@@ -105,10 +107,20 @@ function App() {
     };
   }, [fetchCurrentAccount, fetchAccounts, loadConfig]);
 
+  // 启动时在后台静默检查一次更新 (延迟 4 秒，避开应用启动峰值)
+  useEffect(() => {
+    if (!isTauri() || window.location.pathname === '/menubar') return;
+    const timer = setTimeout(() => {
+      void useUpdateStore.getState().checkForUpdates(true);
+    }, 4000);
+    return () => clearTimeout(timer);
+  }, []);
+
   return (
     <>
       <ThemeManager />
       <RouterProvider router={router} />
+      <UpdateDialog />
     </>
   );
 }

@@ -323,6 +323,8 @@ pub fn run() {
             commands::update_account_label,
             commands::get_local_token_usage,
             commands::get_api_pricing,
+            commands::check_for_updates,
+            commands::download_and_install_update,
         ])
         .build(tauri::generate_context!())
         .expect("error while building tauri application")

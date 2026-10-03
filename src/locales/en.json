@@ -45,7 +45,14 @@
     "no_token_records": "Generate content with Antigravity, then refresh to see local token usage.",
     "cached_tokens": "Cached",
     "input_short": "Input",
-    "output_short": "Output"
+    "output_short": "Output",
+    "view_tokens": "Tokens",
+    "view_cost_pie": "Cost Pie",
+    "model_cost_breakdown": "Cost by Model",
+    "no_cost_in_range": "No cost recorded in this range",
+    "unpriced_models_hint": "{{count}} model(s) unpriced",
+    "cost_share": "Cost share",
+    "details": "Details"
   },
   "local_settings": {
     "title": "Settings",

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { BarChart3, CalendarDays, Cpu, Database, DollarSign, MessageSquare, RefreshCw } from 'lucide-react';
+import { BarChart3, CalendarDays, Cpu, Database, DollarSign, Info, MessageSquare, PieChart, RefreshCw } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { request as invoke } from '../utils/request';
 import { showToast } from '../components/common/ToastContainer';
@@ -117,7 +117,7 @@ const chartBarMaxWidth: Record<RangeKey, number> = {
 
 // 离线兜底价格；在线时优先使用 Google 官方价格页同步的结果。
 const FALLBACK_MODEL_PRICING: Array<{ pattern: RegExp; pricing: ModelPricing }> = [
-    { pattern: /claude.*sonnet.*4[.\-_ ]?6/i, pricing: { input: 3, output: 15, cached: 0.3 } },
+    { pattern: /claude.*(sonnet|opus|haiku|3[.\-_ ]?5|3[.\-_ ]?7|4[.\-_ ]?6)/i, pricing: { input: 3, output: 15, cached: 0.3 } },
     { pattern: /gemini.*3[.\-_ ]?1.*flash.*image/i, pricing: { input: 0.5, output: 60, cached: 0 } },
     { pattern: /gemini.*3[.\-_ ]?8.*flash/i, pricing: { input: 0.75, output: 3.75, cached: 0.075 } },
     { pattern: /gemini.*3[.\-_ ]?1.*pro/i, pricing: { input: 2, output: 12, cached: 0.2 } },
@@ -126,6 +126,28 @@ const FALLBACK_MODEL_PRICING: Array<{ pattern: RegExp; pricing: ModelPricing }> 
     { pattern: /gemini.*2[.\-_ ]?5.*pro/i, pricing: { input: 1.25, output: 10, cached: 0.125 } },
     { pattern: /gemini.*2[.\-_ ]?5.*flash.*lite/i, pricing: { input: 0.1, output: 0.4, cached: 0.01 } },
     { pattern: /gemini.*2[.\-_ ]?5.*flash/i, pricing: { input: 0.3, output: 2.5, cached: 0.03 } },
+    { pattern: /gemini.*1[.\-_ ]?5.*pro/i, pricing: { input: 1.25, output: 5, cached: 0.3125 } },
+    { pattern: /gemini.*1[.\-_ ]?5.*flash/i, pricing: { input: 0.075, output: 0.3, cached: 0.01875 } },
+];
+
+export interface ModelCostBreakdown extends LocalTokenModel {
+    costUsd: number;
+    costPercent: number;
+    isPriced: boolean;
+    color: string;
+}
+
+const MODEL_COLORS = [
+    '#8b5cf6', // violet-500
+    '#3b82f6', // blue-500
+    '#10b981', // emerald-500
+    '#f59e0b', // amber-500
+    '#ec4899', // pink-500
+    '#06b6d4', // cyan-500
+    '#f97316', // orange-500
+    '#6366f1', // indigo-500
+    '#14b8a6', // teal-500
+    '#a855f7', // purple-500
 ];
 
 type TokenChartPoint = LocalTokenTotals & {
@@ -172,6 +194,95 @@ const estimateApiCost = (models: LocalTokenModel[], snapshot: ApiPricingSnapshot
     );
 };
 
+function ModelCostDonut({
+    data,
+    totalCost,
+    hoveredModel,
+    onHover,
+}: {
+    data: ModelCostBreakdown[];
+    totalCost: number;
+    hoveredModel: string | null;
+    onHover: (model: string | null) => void;
+}) {
+    const radius = 38;
+    const circumference = 2 * Math.PI * radius; // ~238.761
+
+    const activeItem = data.find((d) => d.model === hoveredModel);
+
+    if (totalCost === 0 || data.length === 0) {
+        return (
+            <div className="relative flex h-[100px] w-[100px] shrink-0 items-center justify-center">
+                <svg viewBox="0 0 100 100" className="h-full w-full -rotate-90">
+                    <circle
+                        cx="50"
+                        cy="50"
+                        r={radius}
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="10"
+                        className="text-gray-100 dark:text-base-200"
+                    />
+                </svg>
+                <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center text-center">
+                    <span className="font-mono text-xs font-bold text-gray-400">$0.00</span>
+                    <span className="text-[9px] text-gray-400">无计费</span>
+                </div>
+            </div>
+        );
+    }
+
+    let accumulatedPercent = 0;
+
+    return (
+        <div className="relative flex h-[100px] w-[100px] shrink-0 items-center justify-center">
+            <svg viewBox="0 0 100 100" className="h-full w-full -rotate-90">
+                <circle
+                    cx="50"
+                    cy="50"
+                    r={radius}
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="11"
+                    className="text-gray-100 dark:text-base-200"
+                />
+                {data.map((slice) => {
+                    const percent = slice.costPercent / 100;
+                    const strokeDasharray = `${percent * circumference} ${circumference * (1 - percent)}`;
+                    const strokeDashoffset = -accumulatedPercent * circumference;
+                    accumulatedPercent += percent;
+                    const isHovered = hoveredModel === slice.model;
+
+                    return (
+                        <circle
+                            key={slice.model}
+                            cx="50"
+                            cy="50"
+                            r={radius}
+                            fill="none"
+                            stroke={slice.color}
+                            strokeWidth={isHovered ? 13 : 11}
+                            strokeDasharray={strokeDasharray}
+                            strokeDashoffset={strokeDashoffset}
+                            className="cursor-pointer transition-all duration-150 hover:opacity-90"
+                            onMouseEnter={() => onHover(slice.model)}
+                            onMouseLeave={() => onHover(null)}
+                        />
+                    );
+                })}
+            </svg>
+            <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center text-center p-1">
+                <span className="max-w-[70px] truncate font-mono text-xs font-bold tracking-tight text-gray-900 dark:text-base-content">
+                    {formatUsd(activeItem ? activeItem.costUsd : totalCost)}
+                </span>
+                <span className="max-w-[65px] truncate text-[9px] font-medium text-gray-400 dark:text-gray-500">
+                    {activeItem ? `${activeItem.costPercent.toFixed(1)}%` : '总费用'}
+                </span>
+            </div>
+        </div>
+    );
+}
+
 function TokenCard({
     label,
     value,
@@ -180,6 +291,7 @@ function TokenCard({
     displayValue,
     detail,
     locale,
+    tooltipContent,
 }: {
     label: string;
     value: number;
@@ -188,14 +300,23 @@ function TokenCard({
     displayValue?: string;
     detail?: string;
     locale: string;
+    tooltipContent?: React.ReactNode;
 }) {
     return (
-        <div className="rounded-2xl border border-gray-100 bg-white p-3 shadow-sm dark:border-base-200 dark:bg-base-100">
-            <div className="mb-2 flex items-center gap-1.5 text-xs text-gray-500 dark:text-gray-400">
-                <span className={`rounded-lg p-1.5 ${color}`}>
-                    <Icon className="h-3.5 w-3.5" />
-                </span>
-                {label}
+        <div className="relative group rounded-2xl border border-gray-100 bg-white p-3 shadow-sm transition-all hover:border-gray-200 hover:shadow-md dark:border-base-200 dark:bg-base-100 hover:z-30">
+            <div className="mb-2 flex items-center justify-between">
+                <div className="flex items-center gap-1.5 text-xs text-gray-500 dark:text-gray-400">
+                    <span className={`rounded-lg p-1.5 ${color}`}>
+                        <Icon className="h-3.5 w-3.5" />
+                    </span>
+                    {label}
+                </div>
+                {tooltipContent && (
+                    <span className="flex items-center gap-0.5 cursor-pointer rounded-full bg-amber-50 px-1.5 py-0.5 text-[9px] font-medium text-amber-600 transition-colors group-hover:bg-amber-100 dark:bg-amber-900/30 dark:text-amber-300">
+                        <Info className="h-2.5 w-2.5" />
+                        <span>明细</span>
+                    </span>
+                )}
             </div>
             <div className="text-xl font-bold tracking-tight text-gray-900 dark:text-base-content" title={displayValue || formatTokens(value, locale)}>
                 {displayValue || compactTokens(value, locale)}
@@ -206,6 +327,12 @@ function TokenCard({
             >
                 {detail || `${formatTokens(value, locale)} Token`}
             </div>
+
+            {tooltipContent && (
+                <div className="pointer-events-none absolute right-0 top-full z-50 mt-1.5 hidden w-72 rounded-2xl border border-gray-100 bg-white/95 p-3.5 shadow-2xl backdrop-blur-md transition-all group-hover:pointer-events-auto group-hover:block dark:border-base-300 dark:bg-base-100/95">
+                    {tooltipContent}
+                </div>
+            )}
         </div>
     );
 }
@@ -223,6 +350,8 @@ function Dashboard() {
     const [usage, setUsage] = useState<LocalTokenUsageSummary | null>(null);
     const [pricing, setPricing] = useState<ApiPricingSnapshot | null>(null);
     const [range, setRange] = useState<RangeKey>('today');
+    const [modelViewMode, setModelViewMode] = useState<'tokens' | 'cost'>('cost');
+    const [hoveredDonutModel, setHoveredDonutModel] = useState<string | null>(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const [hoveredPoint, setHoveredPoint] = useState<TokenChartPoint | null>(null);
@@ -343,6 +472,35 @@ function Dashboard() {
     }, [totals]);
 
     const apiCost = useMemo(() => estimateApiCost(modelsForRange, pricing), [modelsForRange, pricing]);
+
+    const modelCostList = useMemo<ModelCostBreakdown[]>(() => {
+        const list = modelsForRange.map((m) => {
+            const p = findModelPricing(m.model, pricing);
+            const costUsd = p
+                ? (m.input_tokens * p.input + m.output_tokens * p.output + m.cached_tokens * p.cached) / 1_000_000
+                : 0;
+            return {
+                ...m,
+                costUsd,
+                costPercent: 0,
+                isPriced: !!p,
+                color: '#64748b',
+            };
+        });
+
+        list.sort((a, b) => {
+            if (b.costUsd !== a.costUsd) return b.costUsd - a.costUsd;
+            return b.total_tokens - a.total_tokens;
+        });
+
+        const totalCost = list.reduce((acc, cur) => acc + cur.costUsd, 0);
+
+        return list.map((item, idx) => ({
+            ...item,
+            costPercent: totalCost > 0 ? (item.costUsd / totalCost) * 100 : 0,
+            color: MODEL_COLORS[idx % MODEL_COLORS.length],
+        }));
+    }, [modelsForRange, pricing]);
 
     // Blended price per token type for the current range, so the chart can show the cost of a
     // single bar. Models without a known price contribute nothing (same caveat as the KPI card).
@@ -467,6 +625,49 @@ function Dashboard() {
                         color="bg-amber-50 text-amber-600 dark:bg-amber-900/20 dark:text-amber-300"
                         icon={DollarSign}
                         locale={locale}
+                        tooltipContent={
+                            <div className="space-y-2">
+                                <div className="flex items-center justify-between border-b border-gray-100 pb-1.5 dark:border-base-200">
+                                    <span className="text-xs font-semibold text-gray-800 dark:text-gray-200">
+                                        {t('local_dashboard.model_cost_breakdown')}
+                                    </span>
+                                    <span className="font-mono text-xs font-bold text-amber-600 dark:text-amber-400">
+                                        {formatUsd(apiCost.usd)}
+                                    </span>
+                                </div>
+                                <div className="max-h-52 space-y-1.5 overflow-y-auto text-xs pr-1">
+                                    {modelCostList.filter((m) => m.costUsd > 0).map((m) => (
+                                        <div key={m.model} className="space-y-0.5">
+                                            <div className="flex items-center justify-between text-[11px]">
+                                                <div className="flex items-center gap-1.5 truncate pr-2">
+                                                    <span className="h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: m.color }} />
+                                                    <span className="truncate font-medium text-gray-700 dark:text-gray-300" title={m.model}>
+                                                        {m.model}
+                                                    </span>
+                                                </div>
+                                                <div className="shrink-0 font-mono">
+                                                    <span className="font-medium text-gray-800 dark:text-gray-200">{formatUsd(m.costUsd)}</span>
+                                                    <span className="ml-1 text-[10px] text-gray-400">({m.costPercent.toFixed(1)}%)</span>
+                                                </div>
+                                            </div>
+                                            <div className="h-1 w-full overflow-hidden rounded-full bg-gray-100 dark:bg-base-200">
+                                                <div className="h-full rounded-full transition-all" style={{ width: `${m.costPercent}%`, backgroundColor: m.color }} />
+                                            </div>
+                                        </div>
+                                    ))}
+                                    {!modelCostList.filter((m) => m.costUsd > 0).length && (
+                                        <div className="py-2 text-center text-[11px] text-gray-400">
+                                            {t('local_dashboard.no_cost_in_range')}
+                                        </div>
+                                    )}
+                                </div>
+                                {apiCost.unpricedModels > 0 && (
+                                    <div className="border-t border-gray-100 pt-1 text-[10px] text-gray-400 dark:border-base-200">
+                                        * {t('local_dashboard.unpriced_models_hint', { count: apiCost.unpricedModels })}
+                                    </div>
+                                )}
+                            </div>
+                        }
                     />
                 </div>
 
@@ -557,33 +758,108 @@ function Dashboard() {
                         <div className="mb-1.5 flex items-center justify-between">
                             <div>
                                 <h2 className="flex items-center gap-2 text-sm font-semibold text-gray-900 dark:text-base-content">
-                                    <Cpu className="h-4 w-4 text-purple-500" />
-                                    {t('local_dashboard.model_usage')}
+                                    {modelViewMode === 'cost' ? (
+                                        <PieChart className="h-4 w-4 text-amber-500" />
+                                    ) : (
+                                        <Cpu className="h-4 w-4 text-purple-500" />
+                                    )}
+                                    {modelViewMode === 'cost'
+                                        ? t('local_dashboard.cost_share', '费用占比')
+                                        : t('local_dashboard.model_usage', '模型用量')}
                                 </h2>
-                                <p className="mt-0.5 text-[11px] text-gray-400 dark:text-gray-500">{t('local_dashboard.local_records', { range: rangeLabels[range] })}</p>
+                                <p className="mt-0.5 text-[11px] text-gray-400 dark:text-gray-500">
+                                    {t('local_dashboard.local_records', { range: rangeLabels[range] })}
+                                </p>
+                            </div>
+                            <div className="flex items-center gap-1 rounded-lg bg-gray-100 p-0.5 dark:bg-base-200">
+                                <button
+                                    type="button"
+                                    onClick={() => setModelViewMode('tokens')}
+                                    className={`px-2 py-0.5 text-[10px] font-medium rounded-md transition-all ${
+                                        modelViewMode === 'tokens'
+                                            ? 'bg-white text-purple-600 shadow-sm dark:bg-base-100 dark:text-purple-400'
+                                            : 'text-gray-500 hover:text-gray-700 dark:text-gray-400'
+                                    }`}
+                                >
+                                    {t('local_dashboard.view_tokens', 'Token 占比')}
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => setModelViewMode('cost')}
+                                    className={`flex items-center gap-1 px-2 py-0.5 text-[10px] font-medium rounded-md transition-all ${
+                                        modelViewMode === 'cost'
+                                            ? 'bg-white text-amber-600 shadow-sm dark:bg-base-100 dark:text-amber-400'
+                                            : 'text-gray-500 hover:text-gray-700 dark:text-gray-400'
+                                    }`}
+                                >
+                                    <PieChart className="h-3 w-3" />
+                                    <span>{t('local_dashboard.view_cost_pie', '费用饼图')}</span>
+                                </button>
                             </div>
                         </div>
-                        <div className="max-h-36 space-y-1.5 overflow-y-auto pr-1 lg:min-h-0 lg:flex-1 lg:max-h-none">
-                            {modelsForRange.slice(0, 8).map((model) => {
-                                const width = totals.total_tokens
-                                    ? Math.max((model.total_tokens / totals.total_tokens) * 100, 2)
-                                    : 0;
-                                return (
-                                    <div key={model.model}>
-                                        <div className="mb-0.5 flex items-center justify-between gap-3 text-[11px]">
-                                            <span className="truncate text-gray-600 dark:text-gray-300" title={model.model}>{model.model}</span>
-                                            <span className="shrink-0 font-mono text-gray-500 dark:text-gray-400">{compactTokens(model.total_tokens, locale)}</span>
+
+                        {modelViewMode === 'tokens' ? (
+                            <div className="max-h-36 space-y-1.5 overflow-y-auto pr-1 lg:min-h-0 lg:flex-1 lg:max-h-none">
+                                {modelsForRange.slice(0, 8).map((model) => {
+                                    const width = totals.total_tokens
+                                        ? Math.max((model.total_tokens / totals.total_tokens) * 100, 2)
+                                        : 0;
+                                    return (
+                                        <div key={model.model}>
+                                            <div className="mb-0.5 flex items-center justify-between gap-3 text-[11px]">
+                                                <span className="truncate text-gray-600 dark:text-gray-300" title={model.model}>{model.model}</span>
+                                                <span className="shrink-0 font-mono text-gray-500 dark:text-gray-400">{compactTokens(model.total_tokens, locale)}</span>
+                                            </div>
+                                            <div className="h-1 overflow-hidden rounded-full bg-gray-100 dark:bg-base-200">
+                                                <div className="h-full rounded-full bg-purple-400" style={{ width: `${width}%` }} />
+                                            </div>
                                         </div>
-                                        <div className="h-1 overflow-hidden rounded-full bg-gray-100 dark:bg-base-200">
-                                            <div className="h-full rounded-full bg-purple-400" style={{ width: `${width}%` }} />
+                                    );
+                                })}
+                                {!loading && !modelsForRange.length && (
+                                    <div className="py-6 text-center text-xs text-gray-400 dark:text-gray-500">{t('local_dashboard.no_model_usage')}</div>
+                                )}
+                            </div>
+                        ) : (
+                            <div className="flex h-full items-center gap-3 overflow-hidden py-1 lg:min-h-0 lg:flex-1">
+                                <ModelCostDonut
+                                    data={modelCostList.filter((m) => m.costUsd > 0)}
+                                    totalCost={apiCost.usd}
+                                    hoveredModel={hoveredDonutModel}
+                                    onHover={setHoveredDonutModel}
+                                />
+                                <div className="flex-1 min-w-0 max-h-32 overflow-y-auto pr-1 space-y-1 lg:max-h-none">
+                                    {modelCostList.filter((m) => m.costUsd > 0).map((item) => (
+                                        <div
+                                            key={item.model}
+                                            onMouseEnter={() => setHoveredDonutModel(item.model)}
+                                            onMouseLeave={() => setHoveredDonutModel(null)}
+                                            className={`flex items-center justify-between text-[11px] p-1 rounded-lg transition-colors cursor-pointer ${
+                                                hoveredDonutModel === item.model
+                                                    ? 'bg-amber-50 dark:bg-amber-900/20'
+                                                    : 'hover:bg-gray-50 dark:hover:bg-base-200/50'
+                                            }`}
+                                        >
+                                            <div className="flex items-center gap-1.5 min-w-0 mr-2">
+                                                <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: item.color }} />
+                                                <span className="truncate font-medium text-gray-700 dark:text-gray-300" title={item.model}>
+                                                    {item.model}
+                                                </span>
+                                            </div>
+                                            <div className="text-right shrink-0 font-mono">
+                                                <span className="font-semibold text-gray-900 dark:text-gray-100">{formatUsd(item.costUsd)}</span>
+                                                <span className="text-[10px] text-gray-400 ml-1">({item.costPercent.toFixed(1)}%)</span>
+                                            </div>
                                         </div>
-                                    </div>
-                                );
-                            })}
-                            {!loading && !modelsForRange.length && (
-                                <div className="py-6 text-center text-xs text-gray-400 dark:text-gray-500">{t('local_dashboard.no_model_usage')}</div>
-                            )}
-                        </div>
+                                    ))}
+                                    {!loading && !modelCostList.filter((m) => m.costUsd > 0).length && (
+                                        <div className="py-6 text-center text-xs text-gray-400 dark:text-gray-500">
+                                            {t('local_dashboard.no_cost_in_range', '所选时段暂无费用记录')}
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                        )}
                     </section>
                 </div>
 
@@ -604,6 +880,7 @@ function Dashboard() {
                                 <thead className="bg-gray-50 text-[10px] uppercase text-gray-500 dark:bg-slate-800 dark:text-gray-300">
                                     <tr>
                                         <th className="px-4 py-1.5 font-medium">{t('local_dashboard.model')}</th>
+                                        <th className="px-4 py-1.5 text-right font-medium">{t('local_dashboard.estimated_cost')}</th>
                                         <th className="px-4 py-1.5 text-right font-medium">{t('local_dashboard.total_tokens_column')}</th>
                                         <th className="px-4 py-1.5 text-right font-medium">{t('local_dashboard.input_short')}</th>
                                         <th className="px-4 py-1.5 text-right font-medium">{t('local_dashboard.output_short')}</th>
@@ -611,9 +888,23 @@ function Dashboard() {
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-gray-100 dark:divide-base-200">
-                                    {modelsForRange.map((model) => (
+                                    {modelCostList.map((model) => (
                                         <tr key={model.model} className="text-gray-700 dark:text-gray-300">
-                                            <td className="max-w-[320px] truncate px-4 py-1.5 font-medium" title={model.model}>{model.model}</td>
+                                            <td className="max-w-[300px] truncate px-4 py-1.5 font-medium" title={model.model}>
+                                                <div className="flex items-center gap-1.5">
+                                                    <span className="h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: model.color }} />
+                                                    <span className="truncate">{model.model}</span>
+                                                </div>
+                                            </td>
+                                            <td className="px-4 py-1.5 text-right font-mono font-medium text-amber-600 dark:text-amber-400">
+                                                {model.isPriced ? (
+                                                    formatUsd(model.costUsd)
+                                                ) : (
+                                                    <span className="text-gray-400 dark:text-gray-500" title={t('local_dashboard.pricing_unavailable')}>
+                                                        -
+                                                    </span>
+                                                )}
+                                            </td>
                                             <td className="px-4 py-1.5 text-right font-mono">{formatTokens(model.total_tokens, locale)}</td>
                                             <td className="px-4 py-1.5 text-right font-mono text-indigo-500">{formatTokens(model.input_tokens, locale)}</td>
                                             <td className="px-4 py-1.5 text-right font-mono text-purple-500">{formatTokens(model.output_tokens, locale)}</td>

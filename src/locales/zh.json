@@ -45,7 +45,14 @@
     "no_token_records": "使用 Antigravity 生成内容后，点击右上角刷新即可看到本地 Token 记录。",
     "cached_tokens": "缓存",
     "input_short": "输入",
-    "output_short": "输出"
+    "output_short": "输出",
+    "view_tokens": "Token 占比",
+    "view_cost_pie": "费用饼图",
+    "model_cost_breakdown": "各模型费用明细",
+    "no_cost_in_range": "所选时段暂无费用记录",
+    "unpriced_models_hint": "有 {{count}} 个模型未在价格表中匹配",
+    "cost_share": "费用占比",
+    "details": "明细"
   },
   "local_settings": {
     "title": "设置",

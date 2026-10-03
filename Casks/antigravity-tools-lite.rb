@@ -12,10 +12,11 @@ cask "antigravity-tools-lite" do
   depends_on macos: ">= :big_sur"
 
   app "Antigravity Tools Lite.app"
+  binary "#{appdir}/Antigravity Tools Lite.app/Contents/MacOS/antigravity-tools", target: "agy-switch"
   binary "#{appdir}/Antigravity Tools Lite.app/Contents/MacOS/antigravity-tools", target: "agy-lite"
 
   caveats <<~EOS
-    Includes the agy-lite command. Run agy-lite --help to get started.
+    Includes the agy-switch command (aliased as agy-lite). Run agy-switch --help to get started.
     This is Tools Lite's management CLI, separate from Google's agy command.
     Account data and system credentials are retained when uninstalling.
   EOS

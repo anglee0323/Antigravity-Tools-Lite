@@ -174,7 +174,11 @@ export function MenuBarSwitchDetails({
                 <div>
                   <dt>{t("auto_switch.model")}</dt>
                   <dd title={config.monitored_model}>
-                    {config.monitored_model}
+                    {config.monitored_model === "all" || !config.monitored_model
+                      ? (i18n.language.startsWith("zh")
+                        ? "全部模型（最低额度）"
+                        : "All models (lowest)")
+                      : config.monitored_model}
                   </dd>
                 </div>
               )}

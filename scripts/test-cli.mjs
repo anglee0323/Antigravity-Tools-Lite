@@ -19,7 +19,7 @@ function run(args, code = 0, exe = binary) {
   return result;
 }
 try {
-  assert.match(run(['--version']).stdout, /^agy-lite \d+\.\d+\.\d+/);
+  assert.match(run(['--version']).stdout, /^(agy-switch|agy-lite) \d+\.\d+\.\d+/);
   assert.match(run(['--help']).stdout, /cached data/);
   assert.deepEqual(JSON.parse(run(['accounts', 'list', '--json']).stdout).accounts, []);
   assert.deepEqual(readdirSync(root), []); // Not even a log/data directory is created.
@@ -47,8 +47,10 @@ try {
   run(['list', '--json'], 1);
   assert.equal(readFileSync(join(data, 'accounts.json'), 'utf8'), 'corrupt');
   if (process.platform !== 'win32') {
-    const link = join(root, 'agy-lite'); symlinkSync(binary, link);
-    assert.match(run([], 0, link).stdout, /Usage:/);
+    const linkSwitch = join(root, 'agy-switch'); symlinkSync(binary, linkSwitch);
+    assert.match(run([], 0, linkSwitch).stdout, /Usage:/);
+    const linkLite = join(root, 'agy-lite'); symlinkSync(binary, linkLite);
+    assert.match(run([], 0, linkLite).stdout, /Usage:/);
   }
   console.log(`${passed} CLI executable smoke checks passed; no GUI, network or credential changes`);
 } finally { rmSync(root, { recursive: true, force: true }); }

@@ -5,7 +5,8 @@ import { cn } from '../../utils/cn';
 import { getQuotaColor, formatTimeRemaining, getTimeRemainingColor } from '../../utils/format';
 
 interface QuotaItemProps {
-    label: string;
+    label: React.ReactNode;
+    title?: string;
     percentage: number;
     resetTime?: string;
     isProtected?: boolean;
@@ -13,7 +14,7 @@ interface QuotaItemProps {
     Icon?: React.ComponentType<{ size?: number; className?: string }>;
 }
 
-export function QuotaItem({ label, percentage, resetTime, isProtected, className, Icon }: QuotaItemProps) {
+export function QuotaItem({ label, title, percentage, resetTime, isProtected, className, Icon }: QuotaItemProps) {
     const { t } = useTranslation();
     const getBgColorClass = (p: number) => {
         const color = getQuotaColor(p);
@@ -50,7 +51,7 @@ export function QuotaItem({ label, percentage, resetTime, isProtected, className
             "relative h-[22px] flex items-center px-1.5 rounded-md overflow-hidden border border-gray-100/50 dark:border-white/5 bg-gray-50/30 dark:bg-white/5 group/quota",
             className
         )}
-            title={label}
+            title={title || (typeof label === 'string' ? label : undefined)}
         >
             {/* Background Progress Bar */}
             <div
@@ -66,7 +67,7 @@ export function QuotaItem({ label, percentage, resetTime, isProtected, className
                 {/* Model Name */}
                 <span className={cn(
                     "flex-1 min-w-0 text-gray-500 dark:text-gray-400 font-bold truncate text-left flex items-center gap-1"
-                )} title={label}>
+                )} title={title || (typeof label === 'string' ? label : undefined)}>
                     {Icon && <Icon size={12} className="shrink-0" />}
                     {label}
                 </span>

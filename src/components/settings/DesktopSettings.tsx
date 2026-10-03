@@ -61,8 +61,11 @@ export default function DesktopSettings() {
     setBusy(key);
     setError("");
     try {
+      const patch = key === "hide_dock_icon"
+        ? { hide_dock_icon: value, start_minimized: value }
+        : { [key]: value };
       const next = await request<DesktopStatus>("set_desktop_preferences", {
-        patch: { [key]: value },
+        patch,
       });
       if (live.current && generation.current === requestId) {
         setStatus(next);
@@ -84,6 +87,7 @@ export default function DesktopSettings() {
       if (live.current && generation.current === requestId) setBusy(null);
     }
   };
+  const isMac = !status || status.platform === "macos";
   const rows: {
     key: Preference;
     title: string;
@@ -99,17 +103,10 @@ export default function DesktopSettings() {
       note: status && !status.autostart_supported ? t.releaseOnly : undefined,
     },
     {
-      key: "start_minimized",
-      title: t.background,
-      hint: t.backgroundHint,
-      disabled: !status?.tray_available || !status.launch_at_login,
-    },
-    {
-      key: "hide_dock_icon",
-      title: t.dock,
-      hint: t.dockHint,
-      disabled: status?.platform !== "macos" || !status.tray_available,
-      note: status && status.platform !== "macos" ? t.macOnly : undefined,
+      key: isMac ? "hide_dock_icon" : "start_minimized",
+      title: isMac ? t.dock : t.background,
+      hint: isMac ? t.dockHint : t.backgroundHint,
+      disabled: !status?.tray_available,
     },
   ];
   return (

@@ -53,6 +53,9 @@ jobs:
       - name: Test menu-bar quota presentation
         run: node scripts/test-menubar-logic.mjs && node scripts/test-account-dashboard.mjs
 
+      - name: Test settings category component contracts
+        run: node scripts/test-settings-layout.mjs
+
       - name: Test desktop preference UI races
         run: node scripts/test-desktop-settings.mjs
       - name: Install Chromium for mocked UI acceptance

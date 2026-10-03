@@ -40,7 +40,8 @@ test.beforeEach(async ({ page }) => {
         localStorage.setItem('i18nextLng', 'zh');
     });
     await page.goto('/settings');
-    await expect(page.getByRole('heading', { name: '低额度换号' })).toBeVisible();
+    await page.getByRole('tab', { name: '低额度换号', exact: true }).click();
+    await expect(page.getByRole('tabpanel', { name: '低额度换号', exact: true })).toBeVisible();
 });
 
 async function enable(page: any, stop = false) {

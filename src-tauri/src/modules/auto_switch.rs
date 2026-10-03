@@ -51,7 +51,7 @@ impl Default for Config {
             mode: Mode::Wait,
             reserve_percentage: 10,
             candidate_min_percentage: 30,
-            monitored_model: String::new(),
+            monitored_model: "all".into(),
             candidate_account_ids: vec![],
             target: Target::App,
         }
@@ -65,8 +65,8 @@ impl Config {
         {
             return Err("Choose a reserve from 1–98% and a candidate minimum above the reserve, up to 100%.".into());
         }
-        if self.candidate_account_ids.len() > 10 || self.monitored_model.len() > 200 {
-            return Err("Select no more than 10 candidate accounts.".into());
+        if self.candidate_account_ids.len() > 100 || self.monitored_model.len() > 200 {
+            return Err("Select no more than 100 candidate accounts.".into());
         }
         let mut ids = HashSet::new();
         if self
@@ -76,11 +76,9 @@ impl Config {
         {
             return Err("Candidate accounts must be unique.".into());
         }
-        if self.enabled
-            && (self.monitored_model.trim().is_empty() || self.candidate_account_ids.is_empty())
-        {
+        if self.enabled && self.candidate_account_ids.is_empty() {
             return Err(
-                "Choose a model and at least one allowed backup account before enabling.".into(),
+                "Choose at least one allowed backup account before enabling.".into(),
             );
         }
         Ok(())
@@ -206,6 +204,46 @@ fn remaining(q: &QuotaData, model: &str, now: i64) -> Result<f64, &'static str> 
     if q.last_updated > now + 30 || now - q.last_updated > QUOTA_MAX_AGE {
         return Err("stale_quota");
     }
+    let trimmed = model.trim();
+    if trimmed.is_empty() || trimmed.eq_ignore_ascii_case("all") {
+        let mut min_val: Option<f64> = None;
+        for m in &q.models {
+            if let Ok(val) = remaining_single_model(q, &m.name, now) {
+                min_val = Some(min_val.map_or(val, |old| old.min(val)));
+            }
+        }
+        return min_val.ok_or("unknown_pool");
+    }
+    if trimmed.eq_ignore_ascii_case("gemini") {
+        let mut min_val: Option<f64> = None;
+        for m in &q.models {
+            if m.name.to_ascii_lowercase().starts_with("gemini") {
+                if let Ok(val) = remaining_single_model(q, &m.name, now) {
+                    min_val = Some(min_val.map_or(val, |old| old.min(val)));
+                }
+            }
+        }
+        return min_val.ok_or("unknown_pool");
+    }
+    if trimmed.eq_ignore_ascii_case("claude")
+        || trimmed.eq_ignore_ascii_case("3p")
+        || trimmed.eq_ignore_ascii_case("non-gemini")
+    {
+        let mut min_val: Option<f64> = None;
+        for m in &q.models {
+            let lower = m.name.to_ascii_lowercase();
+            if lower.starts_with("claude") || lower.starts_with("gpt") {
+                if let Ok(val) = remaining_single_model(q, &m.name, now) {
+                    min_val = Some(min_val.map_or(val, |old| old.min(val)));
+                }
+            }
+        }
+        return min_val.ok_or("unknown_pool");
+    }
+    remaining_single_model(q, trimmed, now)
+}
+
+fn remaining_single_model(q: &QuotaData, model: &str, now: i64) -> Result<f64, &'static str> {
     let mut resolved = model;
     for _ in 0..8 {
         if let Some(next) = q.model_forwarding_rules.get(resolved) {
@@ -1094,16 +1132,26 @@ mod tests {
         assert!(c.validate().is_err());
         c = config(Mode::Wait);
         assert!(c.validate().is_ok());
+        c.monitored_model = "all".into();
+        assert!(c.validate().is_ok());
+        c.monitored_model = "".into();
+        assert!(c.validate().is_ok());
         c.candidate_min_percentage = 10;
         assert!(c.validate().is_err());
         c.candidate_min_percentage = 30;
-        c.candidate_account_ids.push("B".into());
+        c.candidate_account_ids = (0..101).map(|i| format!("acc_{i}")).collect();
+        assert!(c.validate().is_err());
+        c.candidate_account_ids = vec!["B".into(), "B".into()];
         assert!(c.validate().is_err());
     }
     #[test]
     fn considers_both_windows_and_provider_ids_not_labels() {
         assert_eq!(remaining(&quota(0.08, 0.8), "gemini-test", NOW), Ok(8.0));
         assert_eq!(remaining(&quota(0.8, 0.08), "gemini-test", NOW), Ok(8.0));
+        assert_eq!(remaining(&quota(0.08, 0.8), "all", NOW), Ok(8.0));
+        assert_eq!(remaining(&quota(0.8, 0.08), "", NOW), Ok(8.0));
+        assert_eq!(remaining(&quota(0.08, 0.8), "gemini", NOW), Ok(8.0));
+        assert_eq!(remaining(&quota(0.08, 0.8), "claude", NOW), Err("unknown_pool"));
         let mut q = quota(0.8, 0.8);
         q.quota_groups.as_mut().unwrap()[0].buckets[0].bucket_id = "3p-weekly".into();
         assert_eq!(remaining(&q, "gemini-test", NOW), Err("unknown_pool"));

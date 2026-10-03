@@ -101,11 +101,11 @@ function Navbar() {
                 />
             )}
 
-            <div className="max-w-7xl mx-auto px-8 relative" style={{ zIndex: 10 }}>
+            <div className="max-w-7xl mx-auto px-4 relative" style={{ zIndex: 10 }}>
                 {/* 三项主导航独立绝对居中，避免两侧内容宽度不同造成视觉偏右 */}
                 <div className="relative flex h-16 items-center justify-between gap-4">
-                    {/* Logo - 使用父容器宽度做响应式 */}
-                    <div className="@container/logo basis-[200px] shrink min-w-0">
+                    {/* Logo - 自然左对齐 */}
+                    <div className="flex items-center shrink-0 min-w-0">
                         <NavLogo />
                     </div>
 

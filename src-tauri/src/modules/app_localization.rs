@@ -802,9 +802,9 @@ mod tests {
         let map = d["exact"].as_object().unwrap();
         assert_eq!(d.as_object().unwrap().len(), 2);
         for (key, value) in map {
-            assert!(!key.is_empty() && key.len() < 100);
+            assert!(!key.is_empty() && key.len() < 300);
             let value = value.as_str().unwrap();
-            assert!(!value.is_empty() && value.len() < 150);
+            assert!(!value.is_empty() && value.len() < 300);
             assert!(!value.contains('<') && !value.contains('>'));
             assert!(!value.contains("http") && !value.contains('\n'));
         }

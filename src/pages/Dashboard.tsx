@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { BarChart3, CalendarDays, Cpu, Database, DollarSign, MessageSquare, RefreshCw } from 'lucide-react';
+import { Activity, BarChart3, CalendarDays, Cpu, Database, DollarSign, LayoutDashboard, MessageSquare, RefreshCw } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { request as invoke } from '../utils/request';
 import { showToast } from '../components/common/ToastContainer';
@@ -392,7 +392,7 @@ function Dashboard() {
                 <div className="flex flex-wrap items-center justify-between gap-2">
                     <div className="min-w-0">
                         <h1 className="flex items-center gap-2 text-xl font-bold text-gray-900 dark:text-base-content">
-                            <BarChart3 className="h-5 w-5 text-blue-500" />
+                            <LayoutDashboard className="h-5 w-5 text-blue-500" />
                             {t('local_dashboard.title')}
                         </h1>
                         <p className="mt-0.5 text-xs text-gray-500 dark:text-gray-400">
@@ -475,7 +475,7 @@ function Dashboard() {
                         <div className="mb-1.5 flex flex-col gap-1.5 sm:flex-row sm:items-start sm:justify-between">
                             <div>
                                 <h2 className="flex items-center gap-2 text-sm font-semibold text-gray-900 dark:text-base-content">
-                                    <BarChart3 className="h-4 w-4 text-blue-500" />
+                                    <Activity className="h-4 w-4 text-blue-500" />
                                     {rangeLabels[range]}
                                 </h2>
                                 <p className="mt-0.5 text-[11px] text-gray-400 dark:text-gray-500">{t('local_dashboard.chart_subtitle')}</p>

@@ -28,16 +28,24 @@ body {
   border: none;
 }
 
-html {
+html.panel-window,
+html.panel-window body,
+html.panel-window #root {
+  background: transparent !important;
+  background-color: transparent !important;
+  overflow: hidden !important;
+}
+
+html:not(.panel-window) {
   background-color: #FAFBFC;
 }
 
-html.dark {
+html.dark:not(.panel-window) {
   background-color: #1d232a;
 }
 
 /* 全局样式 */
-body {
+body:not(.panel-window) {
   margin: 0;
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
     'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
@@ -48,7 +56,7 @@ body {
 }
 
 /* Dark mode override for body strictly */
-.dark body {
+.dark body:not(.panel-window) {
   background-color: #1d232a;
   /* matches base-300 commonly used */
 }

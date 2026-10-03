@@ -1,4 +1,6 @@
 import { Bot, BrainCircuit, Sparkles } from 'lucide-react';
+import type { ModelQuota } from '../types/account';
+import { getModelProtectionKey } from '../utils/modelCategory';
 
 const Gemini = { Color: Sparkles };
 const Claude = { Color: BrainCircuit };
@@ -78,6 +80,46 @@ export const MODEL_CONFIG: Record<string, ModelConfig> = {
         group: 'Gemini 3',
         tags: ['flash'],
     },
+    'gemini-3.8-flash-high': {
+        label: 'Gemini 3.8 Flash (High)',
+        shortLabel: 'G3.8 Flash',
+        protectedKey: 'gemini-flash',
+        Icon: Gemini.Color,
+        group: 'Gemini 3',
+        tags: ['flash', 'high'],
+    },
+    'gemini-3.8-flash-medium': {
+        label: 'Gemini 3.8 Flash (Medium)',
+        shortLabel: 'G3.8 Flash',
+        protectedKey: 'gemini-flash',
+        Icon: Gemini.Color,
+        group: 'Gemini 3',
+        tags: ['flash', 'medium'],
+    },
+    'gemini-3.8-flash-low': {
+        label: 'Gemini 3.8 Flash (Low)',
+        shortLabel: 'G3.8 Flash',
+        protectedKey: 'gemini-flash',
+        Icon: Gemini.Color,
+        group: 'Gemini 3',
+        tags: ['flash', 'low'],
+    },
+    'gemini-3.7-flash-high': {
+        label: 'Gemini 3.7 Flash (High)',
+        shortLabel: 'G3.7 Flash',
+        protectedKey: 'gemini-flash',
+        Icon: Gemini.Color,
+        group: 'Gemini 3',
+        tags: ['flash', 'high'],
+    },
+    'gemini-3.6-flash-high': {
+        label: 'Gemini 3.6 Flash (High)',
+        shortLabel: 'G3.6 Flash',
+        protectedKey: 'gemini-flash',
+        Icon: Gemini.Color,
+        group: 'Gemini 3',
+        tags: ['flash', 'high'],
+    },
     'gemini-3.7-flash': {
         label: 'Gemini 3.7 Flash',
         shortLabel: 'G3.7 Flash',
@@ -85,6 +127,14 @@ export const MODEL_CONFIG: Record<string, ModelConfig> = {
         Icon: Gemini.Color,
         group: 'Gemini 3',
         tags: ['flash'],
+    },
+    'gemini-3.7-flash-tiered': {
+        label: 'Gemini 3.7 Flash Tiered',
+        shortLabel: 'G3.7 Tiered',
+        protectedKey: 'gemini-flash',
+        Icon: Gemini.Color,
+        group: 'Gemini 3',
+        tags: ['flash', 'tiered'],
     },
     'gemini-3.1-flash-lite': {
         label: 'Gemini 3.1 Flash Lite',
@@ -228,74 +278,44 @@ export const getModelConfig = (modelId: string): ModelConfig | undefined => {
 };
 
 /**
- * 模型排序权重配置
- * 数字越小，优先级越高
+ * 获取模型的排序权重（动态识别版本号，确保未来新模型自动优先排序）
  */
-const MODEL_SORT_WEIGHTS = {
-    // 系列权重 (第一优先级)
-    series: {
-        'gemini-3': 100,
-        'gemini-2.5': 200,
-        'gemini-2': 300,
-        'claude': 400,
-    },
-    // 性能级别权重 (第二优先级)
-    tier: {
-        'pro': 10,
-        'flash': 20,
-        'lite': 30,
-        'opus': 5,
-        'sonnet': 10,
-    },
-    // 特殊后缀权重 (第三优先级)
-    suffix: {
-        'thinking': 1,
-        'image': 2,
-        'high': 0,
-        'low': 3,
-    }
-};
-
-/**
- * 获取模型的排序权重
- */
-function getModelSortWeight(modelId: string): number {
+export function getModelSortWeight(modelId: string): number {
     const id = modelId.toLowerCase();
     let weight = 0;
 
-    // 1. 系列权重 (x1000)
-    if (id.startsWith('gemini-3')) {
-        weight += MODEL_SORT_WEIGHTS.series['gemini-3'] * 1000;
-    } else if (id.startsWith('gemini-2.5')) {
-        weight += MODEL_SORT_WEIGHTS.series['gemini-2.5'] * 1000;
-    } else if (id.startsWith('gemini-2')) {
-        weight += MODEL_SORT_WEIGHTS.series['gemini-2'] * 1000;
-    } else if (id.startsWith('claude')) {
-        weight += MODEL_SORT_WEIGHTS.series['claude'] * 1000;
+    // 1. 系列权重 (动态匹配 Gemini 版本，新版本自动优先)
+    const geminiVer = id.match(/^gemini-(\d+(\.\d+)?)/);
+    if (geminiVer) {
+        const v = parseFloat(geminiVer[1]);
+        // 动态计算：版本越高权重数字越小，如 4.0 -> 50000, 3.8 -> 54000, 3.1 -> 68000, 2.5 -> 80000
+        weight += Math.max(10000, Math.round(130000 - v * 20000));
+    } else if (id.includes('claude')) {
+        weight += 200000;
+    } else {
+        weight += 300000;
     }
 
-    // 2. 性能级别权重 (x100)
-    if (id.includes('pro')) {
-        weight += MODEL_SORT_WEIGHTS.tier['pro'] * 100;
+    // 2. 性能级别权重
+    if (id.includes('opus')) {
+        weight += 500;
+    } else if (id.includes('pro') || id.includes('sonnet')) {
+        weight += 1000;
     } else if (id.includes('flash')) {
-        weight += MODEL_SORT_WEIGHTS.tier['flash'] * 100;
+        weight += 2000;
     } else if (id.includes('lite')) {
-        weight += MODEL_SORT_WEIGHTS.tier['lite'] * 100;
-    } else if (id.includes('opus')) {
-        weight += MODEL_SORT_WEIGHTS.tier['opus'] * 100;
-    } else if (id.includes('sonnet')) {
-        weight += MODEL_SORT_WEIGHTS.tier['sonnet'] * 100;
+        weight += 3000;
     }
 
-    // 3. 特殊后缀权重 (x10)
-    if (id.includes('thinking')) {
-        weight += MODEL_SORT_WEIGHTS.suffix['thinking'] * 10;
+    // 3. 特殊后缀权重
+    if (id.includes('high')) {
+        weight += 0;
+    } else if (id.includes('thinking')) {
+        weight += 10;
     } else if (id.includes('image')) {
-        weight += MODEL_SORT_WEIGHTS.suffix['image'] * 10;
-    } else if (id.includes('high')) {
-        weight += MODEL_SORT_WEIGHTS.suffix['high'] * 10;
+        weight += 20;
     } else if (id.includes('low')) {
-        weight += MODEL_SORT_WEIGHTS.suffix['low'] * 10;
+        weight += 30;
     }
 
     return weight;
@@ -335,3 +355,105 @@ export {
     type ModelCategory,
     type QuotaModelSelection,
 } from '../utils/modelCategory';
+
+export const DEFAULT_PINNED_MODELS: string[] = [
+    'gemini-3.1-pro-high',
+    'gemini-3.8-flash-high',
+    'claude-sonnet-4-6',
+];
+
+export interface DisplayQuotaModelItem {
+    id: string;
+    label: string;
+    protectedKey: string;
+    Icon: any;
+    data?: ModelQuota;
+}
+
+/**
+ * 获取卡片与表格统一展示的模型列表
+ * 严格对齐用户配置的 pinnedConfigIds 决定显示项，选多少个就展示多少个，绝不折叠或丢弃任何合法模型
+ */
+export function getDisplayQuotaModels(
+    accountModels: ModelQuota[] | undefined,
+    pinnedConfigIds: string[] | undefined
+): DisplayQuotaModelItem[] {
+    const pinned = (pinnedConfigIds && pinnedConfigIds.length > 0)
+        ? pinnedConfigIds
+        : DEFAULT_PINNED_MODELS;
+
+    const lowerAccountModelsMap = new Map<string, ModelQuota>();
+    for (const m of (accountModels || [])) {
+        if (m.name) {
+            lowerAccountModelsMap.set(m.name.toLowerCase().trim(), m);
+        }
+    }
+
+    const results: DisplayQuotaModelItem[] = [];
+
+    for (const selectorId of pinned) {
+        const normId = selectorId.toLowerCase().trim();
+        // 1. 优先从账号真实配额中按名字精确查找
+        let rawModel = lowerAccountModelsMap.get(normId);
+
+        // 2. 如果账号中没有完全同名项，再通过轻度归一化查找兼容别名
+        if (!rawModel) {
+            for (const [accName, accModel] of lowerAccountModelsMap.entries()) {
+                if (accName === normId || accName.replace(/-/g, '') === normId.replace(/-/g, '')) {
+                    rawModel = accModel;
+                    break;
+                }
+            }
+        }
+
+        const conf = MODEL_CONFIG[normId] || (rawModel?.name ? MODEL_CONFIG[rawModel.name.toLowerCase()] : undefined);
+
+        const formatName = (str: string) => {
+            return str
+                .split('-')
+                .map(part => {
+                    const p = part.toLowerCase();
+                    if (p === 'gpt') return 'GPT';
+                    if (p === 'oss') return 'OSS';
+                    if (p === 'high') return '(High)';
+                    if (p === 'low') return '(Low)';
+                    if (p === 'medium') return '(Medium)';
+                    if (p === 'thinking') return '(Thinking)';
+                    return part.charAt(0).toUpperCase() + part.slice(1);
+                })
+                .join(' ')
+                .replace(/\s+\(/g, ' (');
+        };
+
+        const fallbackLabel = formatName(normId);
+
+        // 仅在明确具备可读显示名时采纳，避免原始全小写连字符透传
+        const cleanDisplayName = rawModel?.display_name && rawModel.display_name !== rawModel.name && !rawModel.display_name.includes('-')
+            ? rawModel.display_name
+            : undefined;
+
+        const label = cleanDisplayName
+            || conf?.label
+            || conf?.shortLabel
+            || (rawModel?.display_name ? formatName(rawModel.display_name) : undefined)
+            || (rawModel?.name ? formatName(rawModel.name) : undefined)
+            || fallbackLabel;
+
+        const protectedKey = getModelProtectionKey(rawModel?.name || selectorId)
+            || conf?.protectedKey
+            || selectorId;
+
+        const Icon = conf?.Icon || (normId.includes('claude') ? Claude.Color : normId.includes('gemini') ? Gemini.Color : Bot);
+
+        results.push({
+            id: rawModel?.name || selectorId,
+            label,
+            protectedKey,
+            Icon,
+            data: rawModel || ({ name: selectorId, percentage: 0 } as ModelQuota),
+        });
+    }
+
+    return sortModels(results);
+}
+

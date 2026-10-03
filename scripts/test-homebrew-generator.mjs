@@ -28,6 +28,7 @@ test('cask pins exact local archive hash, arm64 and bundled management CLI', () 
   assert.ok(cask.includes(createHash('sha256').update(readFileSync(archive)).digest('hex')));
   assert.ok(cask.includes(`url "${url}"`));
   assert.ok(cask.includes('depends_on arch: :arm64'));
+  assert.ok(cask.includes('target: "agy-switch"'));
   assert.ok(cask.includes('target: "agy-lite"'));
   assert.ok(!cask.includes('sha256 :no_check')); assert.ok(!cask.includes('@VERSION@'));
   assert.equal(cask, renderCask({ archive, url, version, template }));

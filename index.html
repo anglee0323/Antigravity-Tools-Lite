@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en" style="background-color: #1a1f2e;">
+<html lang="en">
 
 <head>
   <meta charset="UTF-8" />
@@ -9,14 +9,21 @@
   <script>
     (function () {
       try {
+        const isMenubar = window.location.pathname.includes('menubar') || 
+                          window.location.hash.includes('menubar') || 
+                          window.location.search.includes('menubar') ||
+                          window.location.href.includes('menubar');
         const savedTheme = localStorage.getItem('app-theme-preference');
         const systemDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-
-        // Determine if should be dark for later use, but ALWAYS start with splash color
         const shouldBeDark = savedTheme === 'dark' || ((!savedTheme || savedTheme === 'system') && systemDark);
 
-        // Set background color IMMEDIATELY to SPLASH COLOR (seamless transition)
-        document.documentElement.style.backgroundColor = '#1a1f2e';
+        if (isMenubar) {
+          document.documentElement.classList.add('panel-window');
+          document.documentElement.style.setProperty('background-color', 'transparent', 'important');
+          document.documentElement.style.setProperty('background', 'transparent', 'important');
+        } else {
+          document.documentElement.style.backgroundColor = shouldBeDark ? '#1a1f2e' : '#FAFBFC';
+        }
 
         if (shouldBeDark) {
           document.documentElement.classList.add('dark');
@@ -27,19 +34,21 @@
         }
       } catch (e) {
         console.error('Failed to apply theme during boot:', e);
-        document.documentElement.style.backgroundColor = '#1a1f2e';
       }
     })();
   </script>
   <style>
-    /* Critical CSS: Force splash color initially */
-    html {
-      background-color: #1a1f2e !important;
+    /* Critical CSS: Initial splash background for main window only */
+    html:not(.panel-window) {
+      background-color: #1a1f2e;
     }
-
-    /* These specific overrides will apply when React loads and removes the splash screen logic, 
-       but for now we want everything to look like the splash screen */
-
+    html.panel-window,
+    html.panel-window body,
+    html.panel-window #root {
+      background-color: transparent !important;
+      background: transparent !important;
+      overflow: hidden !important;
+    }
     body {
       margin: 0;
       background-color: transparent;
@@ -47,7 +56,7 @@
   </style>
 </head>
 
-<body style="margin: 0; background-color: #1a1f2e;">
+<body>
 
 
 

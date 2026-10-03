@@ -36,17 +36,18 @@ import {
     Tag,
     Clock,
     Bot,
+    BrainCircuit,
     ArrowUpDown,
     ArrowUp,
     ArrowDown,
 } from 'lucide-react';
-import type { Account, ModelQuota } from '../../types/account';
+import type { Account } from '../../types/account';
 import { useTranslation } from 'react-i18next';
 import { cn } from '../../utils/cn';
 
 import { useConfigStore } from '../../stores/useConfigStore';
 import { QuotaItem } from './QuotaItem';
-import { MODEL_CONFIG, sortModels, resolveQuotaModels, ensurePinnedImageSelector } from '../../config/modelConfig';
+import { getDisplayQuotaModels } from '../../config/modelConfig';
 import { categorizeModel, getModelProtectionKey } from '../../utils/modelCategory';
 import { getValidationBlockedStatusLabel } from './accountValidationStatus';
 
@@ -276,7 +277,7 @@ function AccountRowContent({
     quotaWindow,
 }: AccountRowContentProps) {
     const { t } = useTranslation();
-    const { config, showAllQuotas } = useConfigStore();
+    const { config } = useConfigStore();
     const validationBlockedLabel = getValidationBlockedStatusLabel(account.validation_blocked_reason, t);
 
     // 解析周配额项 (当处于 weekly 视图时)
@@ -286,92 +287,75 @@ function AccountRowContent({
             return group.buckets
                 .filter(b => b.window.toLowerCase().includes('week') || b.bucket_id.toLowerCase().includes('week'))
                 .map(b => {
-                    const shortGroupName = group.display_name
-                        .replace(/ models?$/i, '')
-                        .replace(/Claude and GPT/i, 'Claude/GPT');
+                    const isClaude = group.display_name.toLowerCase().includes('claude') || group.display_name.toLowerCase().includes('gpt');
+                    const title = isClaude ? 'Claude / GPT' : 'Gemini';
+                    const poolBadge = t('accounts.shared_pool', '共享池');
                     return {
                         id: `${group.display_name}-${b.bucket_id}`,
-                        label: b.display_name ? `${shortGroupName} (${b.display_name})` : `${shortGroupName} (周)`,
+                        title,
+                        poolBadge,
                         percentage: Math.round((b.remaining_fraction || 0) * 100),
                         resetTime: b.reset_time,
-                        Icon: shortGroupName.toLowerCase().includes('claude') ? Sparkles : Bot,
+                        Icon: isClaude ? BrainCircuit : Sparkles,
                     };
                 });
         });
-    }, [quotaWindow, account.quota?.quota_groups]);
+    }, [quotaWindow, account.quota?.quota_groups, t]);
 
-    // 获取要显示的模型列表
-    const pinnedModels = ensurePinnedImageSelector(
-        config?.pinned_quota_models?.models || Object.keys(MODEL_CONFIG),
-    );
-
-    // 根据 show_all 状态决定显示哪些模型
-    const uniqueLabels = new Set<string>();
-    const displayModels = sortModels(
-        (showAllQuotas
-            ? (account.quota?.models || []).map(m => {
-                const config = MODEL_CONFIG[m.name.toLowerCase()];
-                const label = m.display_name || config?.label || config?.shortLabel || m.name;
-                return {
-                    id: m.name.toLowerCase(),
-                    label: label,
-                    protectedKey: config?.protectedKey || m.name.toLowerCase(),
-                    data: m
-                };
-            })
-            : resolveQuotaModels(account.quota?.models, pinnedModels).map(sel => {
-                const selectorConfig = MODEL_CONFIG[sel.selectorId.toLowerCase()];
-                const resolvedConfig = sel.model ? MODEL_CONFIG[sel.model.name.toLowerCase()] : undefined;
-                if (!selectorConfig && !sel.model) return null;
-                const label = sel.model?.display_name
-                    || resolvedConfig?.label || resolvedConfig?.shortLabel
-                    || selectorConfig?.label || selectorConfig?.shortLabel
-                    || sel.selectorId;
-                return {
-                    id: sel.model?.name.toLowerCase() ?? sel.selectorId.toLowerCase(),
-                    label,
-                    protectedKey: getModelProtectionKey(sel.model?.name ?? sel.selectorId) ?? resolvedConfig?.protectedKey ?? selectorConfig?.protectedKey ?? sel.selectorId,
-                    data: sel.model,
-                };
-            }).filter((item): item is { id: string; label: string; protectedKey: string; data: ModelQuota | undefined } => item !== null)
-    ).filter(m => {
-            // 过滤特定的 Claude/Gemini 思考变体 (在列表页隐藏)
-            const isHiddenThinking = m.id.includes('thinking');
-
-            if (isHiddenThinking) return false;
-
-            // 基于标签去重 (例如 G3.1 Pro 只显示一次)
-            // 优先显示有配额数据的 ID
-            const labelKey = `${m.label}-${m.protectedKey}`;
-            if (uniqueLabels.has(labelKey)) {
-                return false;
-            }
-            if (m.data) {
-                uniqueLabels.add(labelKey);
-                return true;
-            }
-            return true;
-        })
-    ).filter((m, index, self) => {
-        // 第二次过滤：确保即使没有数据的重复 Label 也只保留一个
-        const labelKey = `${m.label}-${m.protectedKey}`;
-        return self.findIndex(t => `${t.label}-${t.protectedKey}` === labelKey) === index;
-    });
-
+    // 获取统一解析后的展示模型列表 (严格对齐用户自定义勾选)
+    const displayModels = useMemo(() => {
+        return getDisplayQuotaModels(account.quota?.models, config?.pinned_quota_models?.models);
+    }, [config?.pinned_quota_models?.models, account.quota?.models]);
 
     return (
         <>
             {/* 邮箱列 */}
             <td className="px-2 py-1 align-middle">
-                <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+                <div className="flex flex-col justify-center gap-1">
                     <span className={cn(
-                        "font-medium text-sm break-all transition-colors",
+                        "font-medium text-sm break-all transition-colors leading-tight",
                         isCurrent ? "text-blue-700 dark:text-blue-400" : "text-gray-900 dark:text-base-content"
                     )} title={account.email}>
                         {account.email}
                     </span>
 
-                    <div className="flex items-center gap-1.5 shrink-0">
+                    <div className="flex items-center gap-1.5 shrink-0 flex-wrap">
+                        {/* 1. 订阅类型徽章 (始终置前，上下对齐) */}
+                        {(() => {
+                            const tier = (account.quota?.subscription_tier || 'free').toLowerCase();
+                            if (tier.includes('ultra')) {
+                                return (
+                                    <span className="flex items-center gap-1 px-2 py-0.5 rounded-md bg-gradient-to-r from-purple-600 to-pink-600 text-white text-[10px] font-bold shadow-sm hover:scale-105 transition-transform cursor-default">
+                                        <Gem className="w-2.5 h-2.5 fill-current" />
+                                        {t('accounts.ultra')}
+                                    </span>
+                                );
+                            } else if (tier.includes('pro')) {
+                                return (
+                                    <span className="flex items-center gap-1 px-2 py-0.5 rounded-md bg-gradient-to-r from-blue-600 to-indigo-600 text-white text-[10px] font-bold shadow-sm hover:scale-105 transition-transform cursor-default">
+                                        <Diamond className="w-2.5 h-2.5 fill-current" />
+                                        {t('accounts.pro')}
+                                    </span>
+                                );
+                            } else {
+                                return (
+                                    <span className="flex items-center gap-1 px-2 py-0.5 rounded-md bg-gray-100 dark:bg-white/10 text-gray-600 dark:text-gray-400 text-[10px] font-bold shadow-sm border border-gray-200 dark:border-white/10 hover:bg-gray-200 transition-colors cursor-default">
+                                        <Circle className="w-2.5 h-2.5" />
+                                        {t('accounts.free')}
+                                    </span>
+                                );
+                            }
+                        })()}
+
+                        {/* 2. 自定义标签 */}
+                        {account.custom_label && (
+                            <span className="flex items-center gap-1 px-2 py-0.5 rounded-md bg-orange-100 dark:bg-orange-900/40 text-orange-700 dark:text-orange-300 text-[10px] font-bold shadow-sm border border-orange-200/50 dark:border-orange-800/50">
+                                <Tag className="w-2.5 h-2.5" />
+                                {account.custom_label}
+                            </span>
+                        )}
+
+                        {/* 3. 额外状态标签 (全部后置，不挤占 Pro 对齐位置) */}
                         {isCurrent && (
                             <span className="px-2 py-0.5 rounded-md bg-blue-100 dark:bg-blue-900/50 text-blue-700 dark:text-blue-300 text-[10px] font-bold shadow-sm border border-blue-200/50 dark:border-blue-800/50">
                                 {t('accounts.current').toUpperCase()}
@@ -396,41 +380,6 @@ function AccountRowContent({
                             <span className="px-2 py-0.5 rounded-md bg-amber-100 dark:bg-amber-900/50 text-amber-700 dark:text-amber-400 text-[10px] font-bold flex items-center gap-1 shadow-sm border border-amber-200/50">
                                 <Clock className="w-2.5 h-2.5" />
                                 <span>{validationBlockedLabel}</span>
-                            </span>
-                        )}
-
-
-                        {/* 订阅类型徽章 */}
-                        {account.quota?.subscription_tier && (() => {
-                            const tier = account.quota.subscription_tier.toLowerCase();
-                            if (tier.includes('ultra')) {
-                                return (
-                                    <span className="flex items-center gap-1 px-2 py-0.5 rounded-md bg-gradient-to-r from-purple-600 to-pink-600 text-white text-[10px] font-bold shadow-sm hover:scale-105 transition-transform cursor-default">
-                                        <Gem className="w-2.5 h-2.5 fill-current" />
-                                        {t('accounts.ultra')}
-                                    </span>
-                                );
-                            } else if (tier.includes('pro')) {
-                                return (
-                                    <span className="flex items-center gap-1 px-2 py-0.5 rounded-md bg-gradient-to-r from-blue-600 to-indigo-600 text-white text-[10px] font-bold shadow-sm hover:scale-105 transition-transform cursor-default">
-                                        <Diamond className="w-2.5 h-2.5 fill-current" />
-                                        {t('accounts.pro')}
-                                    </span>
-                                );
-                            } else {
-                                return (
-                                    <span className="flex items-center gap-1 px-2 py-0.5 rounded-md bg-gray-100 dark:bg-white/10 text-gray-600 dark:text-gray-400 text-[10px] font-bold shadow-sm border border-gray-200 dark:border-white/10 hover:bg-gray-200 transition-colors cursor-default">
-                                        <Circle className="w-2.5 h-2.5" />
-                                        {t('accounts.free')}
-                                    </span>
-                                );
-                            }
-                        })()}
-                        {/* 自定义标签 */}
-                        {account.custom_label && (
-                            <span className="flex items-center gap-1 px-2 py-0.5 rounded-md bg-orange-100 dark:bg-orange-900/40 text-orange-700 dark:text-orange-300 text-[10px] font-bold shadow-sm border border-orange-200/50 dark:border-orange-800/50">
-                                <Tag className="w-2.5 h-2.5" />
-                                {account.custom_label}
                             </span>
                         )}
                     </div>
@@ -459,17 +408,20 @@ function AccountRowContent({
                         </div>
                     </div>
                 ) : (
-                    <div className={cn(
-                        "grid gap-x-2 gap-y-1 py-0",
-                        (quotaWindow === 'weekly' && weeklyItems.length > 0)
-                            ? (weeklyItems.length === 1 ? "grid-cols-1" : "grid-cols-2")
-                            : (displayModels.length === 1 ? "grid-cols-1" : "grid-cols-2")
-                    )}>
+                    <div className="flex flex-col gap-1.5 py-0.5 w-full">
                         {quotaWindow === 'weekly' && weeklyItems.length > 0 ? (
                             weeklyItems.map((item) => (
                                 <QuotaItem
                                     key={item.id}
-                                    label={item.label}
+                                    label={
+                                        <span className="flex items-center gap-1.5 truncate">
+                                            <span>{item.title}</span>
+                                            <span className="px-1 py-0.2 rounded text-[8.5px] font-semibold bg-blue-50 text-blue-600 dark:bg-blue-900/30 dark:text-blue-300 border border-blue-200/50 dark:border-blue-800/30 shrink-0">
+                                                {item.poolBadge}
+                                            </span>
+                                        </span>
+                                    }
+                                    title={`${item.title} (${item.poolBadge})`}
                                     percentage={item.percentage}
                                     resetTime={item.resetTime}
                                     Icon={item.Icon}
@@ -486,7 +438,7 @@ function AccountRowContent({
                                         percentage={modelData?.percentage || 0}
                                         resetTime={modelData?.reset_time}
                                         isProtected={Boolean(config?.quota_protection?.enabled && isModelProtected(account.protected_models, model.protectedKey))}
-                                        Icon={MODEL_CONFIG[model.id]?.Icon || Bot}
+                                        Icon={model.Icon || Bot}
                                     />
                                 );
                             })
@@ -518,23 +470,33 @@ function AccountRowContent({
             )}>
                 <div className="flex items-center justify-center gap-1 opacity-60 group-hover:opacity-100 transition-opacity max-w-[120px] mx-auto">
                     <button
-                        className={`p-1.5 text-gray-500 dark:text-gray-400 rounded-lg transition-all ${(isSwitching || isDisabled) ? 'bg-blue-50 dark:bg-blue-900/10 text-blue-600 dark:text-blue-400 cursor-not-allowed' : 'hover:text-blue-600 dark:hover:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/30'}`}
+                        className={cn(
+                            "p-1.5 rounded-lg transition-all text-gray-500 dark:text-gray-400",
+                            isSwitching
+                                ? "bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 cursor-not-allowed"
+                                : "hover:text-blue-600 dark:hover:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/30 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent disabled:hover:text-gray-500 dark:disabled:hover:text-gray-400"
+                        )}
                         onClick={(e) => { e.stopPropagation(); onSwitch(); }}
                         title={isDisabled ? t('accounts.disabled_tooltip') : (isSwitching ? t('common.loading') : t('accounts.switch_account'))}
                         disabled={isSwitching || isDisabled}
                     >
-                        <ArrowRightLeft className={`w-3.5 h-3.5 ${isSwitching ? 'animate-spin' : ''}`} />
+                        <ArrowRightLeft className={cn("w-3.5 h-3.5", isSwitching && "animate-spin")} />
                     </button>
                     <button
-                        className={`p-1.5 text-gray-500 dark:text-gray-400 rounded-lg transition-all ${(isRefreshing || isDisabled) ? 'bg-green-50 dark:bg-green-900/10 text-green-600 dark:text-green-400 cursor-not-allowed' : 'hover:text-green-600 dark:hover:text-green-400 hover:bg-green-50 dark:hover:bg-green-900/30'}`}
+                        className={cn(
+                            "p-1.5 rounded-lg transition-all text-gray-500 dark:text-gray-400",
+                            isRefreshing
+                                ? "bg-green-50 dark:bg-green-900/20 text-green-600 dark:text-green-400 cursor-not-allowed"
+                                : "hover:text-green-600 dark:hover:text-green-400 hover:bg-green-50 dark:hover:bg-green-900/30 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent disabled:hover:text-gray-500 dark:disabled:hover:text-gray-400"
+                        )}
                         onClick={(e) => { e.stopPropagation(); onRefresh(); }}
                         title={isDisabled ? t('accounts.disabled_tooltip') : (isRefreshing ? t('common.refreshing') : t('accounts.refresh_quota'))}
                         disabled={isRefreshing || isDisabled}
                     >
-                        <RefreshCw className={`w-3.5 h-3.5 ${isRefreshing ? 'animate-spin' : ''}`} />
+                        <RefreshCw className={cn("w-3.5 h-3.5", isRefreshing && "animate-spin")} />
                     </button>
                     <button
-                        className="p-1.5 text-gray-500 dark:text-gray-400 rounded-lg transition-all hover:text-orange-600 dark:hover:text-orange-400 hover:bg-orange-50 dark:hover:bg-orange-900/30 disabled:cursor-not-allowed disabled:opacity-50"
+                        className="p-1.5 text-gray-500 dark:text-gray-400 rounded-lg transition-all hover:text-orange-600 dark:hover:text-orange-400 hover:bg-orange-50 dark:hover:bg-orange-900/30 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent disabled:hover:text-gray-500"
                         onClick={(e) => { e.stopPropagation(); onEditLabel(); }}
                         title={t('accounts.edit_remark', '编辑备注')}
                         aria-label={`${t('accounts.edit_remark', '编辑备注')} ${account.email}`}
@@ -543,7 +505,7 @@ function AccountRowContent({
                         <Tag className="w-3.5 h-3.5" />
                     </button>
                     <button
-                        className="p-1.5 text-gray-500 dark:text-gray-400 rounded-lg transition-all hover:text-red-600 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/30 disabled:cursor-not-allowed disabled:opacity-50"
+                        className="p-1.5 text-gray-500 dark:text-gray-400 rounded-lg transition-all hover:text-red-600 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/30 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent disabled:hover:text-gray-500"
                         onClick={(e) => { e.stopPropagation(); onDelete(); }}
                         title={t('accounts.delete_account')}
                         aria-label={`${t('accounts.delete_account')} ${account.email}`}

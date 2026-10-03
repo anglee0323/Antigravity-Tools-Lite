@@ -84,4 +84,26 @@ await test('unmount prevents pending status and preference responses from writin
   h.button().props.onClick(); h.unmount(); save.resolve(on); await settle();
   assert.equal(h.status.hide_dock_icon, false); assert.equal(h.configLoads, 0);
 });
+await test('menu bar and login preferences are editable and update correctly', async () => {
+  const h = harness(); let preferences = { ...off };
+  h.setHandler(async (command, args) => {
+    if (command === 'set_desktop_preferences') preferences = { ...preferences, ...args.patch };
+    return { ...preferences };
+  });
+  const toggle = key => walk(h.render(), node => node.props?.id === `desktop-${key}`)[0];
+  await h.mount();
+  assert.equal(toggle('hide_dock_icon').props.disabled, false);
+  toggle('hide_dock_icon').props.onClick(); await settle();
+  assert.equal(h.status.hide_dock_icon, true);
+  assert.equal(h.status.start_minimized, true);
+  assert.equal(toggle('hide_dock_icon').props['aria-checked'], true);
+  toggle('launch_at_login').props.onClick(); await settle();
+  assert.equal(h.status.launch_at_login, true);
+  assert.equal(h.status.hide_dock_icon, true);
+  assert.equal(toggle('hide_dock_icon').props.disabled, false);
+  assert.deepEqual(JSON.parse(JSON.stringify(h.calls.filter(c => c.command === 'set_desktop_preferences').map(c => c.args.patch))), [
+    { hide_dock_icon: true, start_minimized: true }, { launch_at_login: true },
+  ]);
+  assert.equal(h.configLoads, 2); h.unmount();
+});
 console.log(`Desktop Settings tests: ${passed} passed`);

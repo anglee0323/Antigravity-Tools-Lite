@@ -1,0 +1,129 @@
+/* Modern macOS / Desktop Settings Layout */
+.settings-layout {
+  display: grid;
+  grid-template-columns: 220px minmax(0, 1fr);
+  height: 100%;
+  min-height: 0;
+  width: 100%;
+}
+
+.settings-sidebar {
+  border-right: 1px solid rgb(229 231 235 / 0.8);
+  background: rgb(249 250 251 / 0.6);
+  backdrop-filter: blur(12px);
+  overflow-y: auto;
+  min-width: 0;
+  padding: 24px 14px;
+}
+.dark .settings-sidebar {
+  border-color: rgb(51 65 85 / 0.6);
+  background: rgb(15 23 42 / 0.4);
+}
+
+.settings-sidebar-title {
+  margin: 0 8px 18px;
+  font-size: 19px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+.settings-tabs {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.settings-tab {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  min-height: 38px;
+  border-radius: 8px;
+  padding: 8px 12px;
+  text-align: left;
+  font-size: 13.5px;
+  line-height: 1.4;
+  font-weight: 500;
+  transition: all 0.15s ease;
+  user-select: none;
+}
+.settings-tab span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.settings-content {
+  min-width: 0;
+  overflow-y: auto;
+  padding: 28px 36px 40px;
+}
+
+.settings-panel {
+  width: 100%;
+  max-width: 780px;
+  margin: 0;
+  outline-offset: 4px;
+}
+.settings-panel[hidden] {
+  display: none;
+}
+
+.settings-section-header {
+  margin-bottom: 22px;
+  padding-bottom: 14px;
+  border-bottom: 1px solid rgb(229 231 235 / 0.8);
+}
+.dark .settings-section-header {
+  border-bottom-color: rgb(51 65 85 / 0.6);
+}
+
+@media (max-width: 900px) {
+  .settings-layout {
+    grid-template-columns: 188px minmax(0, 1fr);
+  }
+  .settings-sidebar {
+    padding: 20px 10px;
+  }
+  .settings-content {
+    padding: 20px 20px 28px;
+  }
+  .settings-tab {
+    gap: 8px;
+    padding: 7px 10px;
+    font-size: 12.5px;
+  }
+}
+
+@media (max-width: 639px) {
+  .settings-layout {
+    display: block;
+    overflow-y: auto;
+  }
+  .settings-sidebar {
+    border-right: 0;
+    border-bottom: 1px solid rgb(229 231 235 / 0.8);
+    overflow: visible;
+    padding: 16px;
+  }
+  .dark .settings-sidebar {
+    border-bottom-color: rgb(51 65 85 / 0.6);
+  }
+  .settings-sidebar-title {
+    margin: 0 0 12px;
+  }
+  .settings-tabs {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 6px;
+  }
+  .settings-tab {
+    min-height: 40px;
+    font-size: 12px;
+    padding: 8px 10px;
+  }
+  .settings-content {
+    overflow: visible;
+    padding: 20px 16px 28px;
+  }
+}

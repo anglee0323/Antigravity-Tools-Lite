@@ -130,6 +130,7 @@ export function pageSlice<T>(items: T[], page: number, pageSize = 4): T[] {
 }
 
 export function pageSizeForHeight(height: number): number {
+  if (height >= 560) return 6;
   if (height >= 440) return 4;
   if (height >= 360) return 3;
   if (height >= 300) return 2;

@@ -32,21 +32,21 @@ pub(super) struct QuotaView {
 }
 #[derive(Debug, Deserialize, Serialize)]
 pub(super) struct ModelView {
-    name: String,
-    percentage: i32,
-    reset_time: String,
+    pub(super) name: String,
+    pub(super) percentage: i32,
+    pub(super) reset_time: String,
 }
 #[derive(Debug, Deserialize, Serialize)]
 pub(super) struct GroupView {
-    display_name: String,
-    buckets: Vec<BucketView>,
+    pub(super) display_name: String,
+    pub(super) buckets: Vec<BucketView>,
 }
 #[derive(Debug, Deserialize, Serialize)]
 pub(super) struct BucketView {
-    bucket_id: String,
-    window: String,
-    remaining_fraction: f64,
-    reset_time: String,
+    pub(super) bucket_id: String,
+    pub(super) window: String,
+    pub(super) remaining_fraction: f64,
+    pub(super) reset_time: String,
 }
 
 #[derive(Deserialize)]

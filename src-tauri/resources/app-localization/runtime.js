@@ -96,17 +96,21 @@
       ? property.value : undefined;
   }
 
+  const contentOwned = new Map();
+  let contentContainer = null;
+
   function status(code, reason, extra) {
+    const totalTranslated = owned.size + contentOwned.size;
     return Object.assign({
       status: code,
       supported: code === 'supported' || code === 'applied',
       active,
       appVersion,
       adapterId: adapter ? adapter.id : null,
-      translated: owned.size,
+      translated: totalTranslated,
       reason: reason || null,
       scopes: scopeStatuses.map((scope) => ({ ...scope })),
-      awaitingScope: active && owned.size === 0,
+      awaitingScope: active && totalTranslated === 0,
     }, extra || {});
   }
 
@@ -134,6 +138,14 @@
         break;
       }
       exact[source] = value;
+    }
+    if (inputExact && typeof inputExact === 'object' && !configError) {
+      for (const key of Object.keys(inputExact)) {
+        const val = ownData(inputExact, key);
+        if (typeof val === 'string' && val.length > 0 && val.length <= 2000 && !exact[key]) {
+          exact[key] = val;
+        }
+      }
     }
   }
 
@@ -279,10 +291,78 @@
     for (const [index, record] of owned) {
       if (mutations.some((mutation) => affected(record, mutation))) owned.delete(index);
     }
+    for (const [node, record] of contentOwned) {
+      if (mutations.some((mutation) => mutation.type === 'characterData' && mutation.target === node && node.data !== record.translated)) {
+        contentOwned.delete(node);
+      }
+    }
   }
 
   function drainExternalWrites() {
     if (observer) releaseExternalWrites(observer.takeRecords());
+  }
+
+  function findContentContainer() {
+    if (!doc || typeof doc.querySelector !== 'function') return null;
+    const modal = doc.querySelector('.settings-modal-container');
+    if (modal) {
+      const panel = modal.querySelector('div[class="flex h-full overflow-auto"]');
+      if (panel) return panel;
+    }
+    return null;
+  }
+
+  function translateContent() {
+    const container = findContentContainer();
+    contentContainer = container;
+    if (!container) {
+      if (contentOwned.size > 0) contentOwned.clear();
+      return 0;
+    }
+    const walker = doc.createTreeWalker(container, 4 /* NodeFilter.SHOW_TEXT */);
+    let node;
+    let count = 0;
+    while ((node = walker.nextNode())) {
+      if (!safeElement(node.parentElement)) continue;
+      const record = contentOwned.get(node);
+      if (record) {
+        if (node.data === record.translated) {
+          count += 1;
+          continue;
+        }
+        contentOwned.delete(node);
+      }
+      const raw = node.data;
+      if (!raw) continue;
+      const trimmed = raw.trim();
+      if (!trimmed) continue;
+      const targetVal = exact[trimmed];
+      if (typeof targetVal === 'string' && targetVal.length > 0 && targetVal !== trimmed) {
+        const translated = raw.replace(trimmed, targetVal);
+        contentOwned.set(node, { original: raw, translated });
+        node.data = translated;
+        count += 1;
+      }
+    }
+    for (const [n] of contentOwned) {
+      if (!n.isConnected) contentOwned.delete(n);
+    }
+    return count;
+  }
+
+  function restoreContent() {
+    let restored = 0;
+    for (const [node, record] of contentOwned) {
+      if (node.isConnected && node.data === record.translated) {
+        try {
+          node.data = record.original;
+          restored += 1;
+        } catch (_) {}
+      }
+    }
+    contentOwned.clear();
+    contentContainer = null;
+    return restored;
   }
 
   function inspect() {
@@ -388,6 +468,7 @@
       } else preserved += 1;
     }
     owned.clear();
+    restored += restoreContent();
     return { restored, preserved };
   }
 
@@ -404,6 +485,8 @@
     if (mutation.type !== 'childList') return false;
     return [...mutation.addedNodes].some((node) => {
       if (!node || node.nodeType !== 1 || !safeElement(node)) return false;
+      const cls = typeof node.getAttribute === 'function' ? (node.getAttribute('class') || '') : '';
+      if (cls.includes('settings-modal-container') || (typeof node.querySelector === 'function' && node.querySelector('.settings-modal-container'))) return true;
       return scopes.some((scope) => matches(node, scope.root) ||
         (typeof node.querySelectorAll === 'function' && node.querySelectorAll(rootSelector(scope)).length > 0));
     });
@@ -414,7 +497,7 @@
       observer = new host.MutationObserver((mutations) => {
         if (!active || disposed) return;
         releaseExternalWrites(mutations);
-        if (!mutations.some((mutation) => dependencies.has(mutation.target) || routeCandidate(mutation))) return;
+        if (!mutations.some((mutation) => dependencies.has(mutation.target) || routeCandidate(mutation) || (contentContainer && (mutation.target === contentContainer || (typeof contentContainer.contains === 'function' && contentContainer.contains(mutation.target)))))) return;
         if (pendingTimer === null) {
           pendingTimer = host.setTimeout(() => {
             pendingTimer = null;
@@ -440,6 +523,12 @@
       for (let parent = root.parentElement; parent; parent = parent.parentElement) {
         if (parent !== doc.documentElement) observer.observe(parent, { childList: true, attributes: true, attributeFilter });
       }
+    }
+    const container = findContentContainer();
+    if (container) {
+      observer.observe(container, {
+        subtree: true, childList: true, characterData: true, characterDataOldValue: true,
+      });
     }
     // Keep document-level route/guard observation when it is also an ancestor.
     observer.observe(doc.documentElement, { subtree: true, childList: true, attributes: true, attributeFilter });
@@ -481,6 +570,7 @@
         owned.set(target.key, record);
         writeValue(target, translated);
       }
+      translateContent();
       active = true;
       lastFailure = null;
       watch();

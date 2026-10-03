@@ -4,7 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { Account } from '../../types/account';
 import { AutoSwitchConfig, AutoSwitchStatus } from '../../types/autoSwitch';
 import * as service from '../../services/autoSwitchService';
-import { listAccounts, getCurrentAccount } from '../../services/accountService';
+import { listAccounts, getCurrentAccount, switchAccount } from '../../services/accountService';
 import { isTauri } from '../../utils/env';
 
 const PRIMARY_BUTTON = 'inline-flex min-h-9 items-center justify-center gap-2 rounded-lg border border-blue-600 bg-blue-600 px-3 py-2 text-sm font-medium text-white transition hover:bg-blue-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:border-slate-200 disabled:bg-slate-100 disabled:text-slate-400 dark:disabled:border-slate-700 dark:disabled:bg-slate-800 dark:disabled:text-slate-500';
@@ -56,6 +56,26 @@ function StatusBody({ status, compact = false }: { status: AutoSwitchStatus; com
                 {status.phase === 'completed' && <p className="text-xs text-slate-500 dark:text-slate-400">{t('auto_switch.manual_continue')}</p>}
             </div>
             <div className="flex shrink-0 flex-wrap gap-2">
+                {status.target_account_id && status.reason === 'clients_running' && (
+                    <button
+                        disabled={busy || status.phase === 'switching'}
+                        onClick={async () => {
+                            setBusy(true);
+                            setError('');
+                            try {
+                                await switchAccount(status.target_account_id!);
+                            } catch (e) {
+                                setError(String(e));
+                            } finally {
+                                setBusy(false);
+                            }
+                        }}
+                        className={PRIMARY_BUTTON}
+                    >
+                        <ArrowLeftRight size={14} />
+                        {t('auto_switch.switch_now_restart')}
+                    </button>
+                )}
                 {status.mode === 'stop' && status.reason === 'clients_running' && <button ref={guideTrigger} onClick={() => setGuide(true)} className={SECONDARY_BUTTON}>{t('auto_switch.stop_guide')}</button>}
                 {status.pending_id && <button disabled={busy || status.phase === 'switching'} onClick={() => action(true)} className={SECONDARY_BUTTON}>{t('auto_switch.cancel')}</button>}
                 <button disabled={busy || status.phase === 'switching'} onClick={() => action(false)} className={SECONDARY_BUTTON}><RefreshCw size={14} className={busy ? 'animate-spin' : ''} />{t('auto_switch.check_now')}</button>
@@ -117,6 +137,20 @@ export function AutoSwitchSettings() {
                     <input type="radio" name="auto-switch-mode" checked={draft.mode === mode} disabled={busy} onChange={() => patch({ mode })} className="mt-0.5 h-4 w-4 shrink-0 accent-blue-600" />
                     <span><span className="block text-sm font-medium">{t(`auto_switch.mode_${mode}`)}</span><span className="mt-1 block text-xs leading-relaxed text-slate-500 dark:text-slate-400">{t(`auto_switch.${mode}_instructions`)}</span></span>
                 </label>)}
+            </div>
+            <div className="my-4">
+                <span className="mb-2 block text-xs font-medium text-slate-600 dark:text-slate-300">{t('auto_switch.strategy_title')}</span>
+                <div className="grid gap-3 md:grid-cols-2" role="group" aria-label={t('auto_switch.strategy_title')}>
+                    {(['round_robin', 'priority'] as const).map(strategy => (
+                        <label key={strategy} className={`flex cursor-pointer items-start gap-3 rounded-xl border p-4 ${draft.strategy === strategy || (!draft.strategy && strategy === 'round_robin') ? 'border-blue-400 bg-blue-50/60 dark:bg-blue-500/10' : 'border-slate-200 dark:border-slate-700'}`}>
+                            <input type="radio" name="auto-switch-strategy" checked={draft.strategy === strategy || (!draft.strategy && strategy === 'round_robin')} disabled={busy} onChange={() => patch({ strategy })} className="mt-0.5 h-4 w-4 shrink-0 accent-blue-600" />
+                            <span>
+                                <span className="block text-sm font-medium">{t(`auto_switch.strategy_${strategy}`)}</span>
+                                <span className="mt-1 block text-xs leading-relaxed text-slate-500 dark:text-slate-400">{t(`auto_switch.strategy_${strategy}_desc`)}</span>
+                            </span>
+                        </label>
+                    ))}
+                </div>
             </div>
             <div className="my-5 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
                 <label className="space-y-2 text-xs text-slate-600 dark:text-slate-300"><span className="block">{t('auto_switch.target')}</span><select aria-label={t('auto_switch.target')} className={FIELD} disabled={busy} value={draft.target} onChange={e => patch({ target: e.target.value as 'app' })}><option value="app">Antigravity APP + agy</option></select></label>

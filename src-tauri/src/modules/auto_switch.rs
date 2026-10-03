@@ -21,6 +21,13 @@ pub enum Mode {
 }
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
+pub enum Strategy {
+    #[default]
+    RoundRobin,
+    Priority,
+}
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
 pub enum Target {
     #[default]
     App,
@@ -38,6 +45,7 @@ impl Target {
 pub struct Config {
     pub enabled: bool,
     pub mode: Mode,
+    pub strategy: Strategy,
     pub reserve_percentage: u8,
     pub candidate_min_percentage: u8,
     pub monitored_model: String,
@@ -49,6 +57,7 @@ impl Default for Config {
         Self {
             enabled: false,
             mode: Mode::Wait,
+            strategy: Strategy::RoundRobin,
             reserve_percentage: 10,
             candidate_min_percentage: 30,
             monitored_model: String::new(),
@@ -853,26 +862,41 @@ async fn evaluate_core<E: Environment>(
         }
     }
     let mut candidate = None;
-    for id in &config.candidate_account_ids {
-        if id == &source_id {
-            continue;
-        }
-        if let Ok(a) = refresh(runtime, &environment, id, force).await {
-            if account_remaining(&a, &config.monitored_model, now)
-                .is_ok_and(|p| p >= config.candidate_min_percentage as f64)
-            {
-                candidate = Some(a);
-                break;
+    let candidate_ids = &config.candidate_account_ids;
+    let len = candidate_ids.len();
+    if len > 0 {
+        let start_idx = match config.strategy {
+            Strategy::RoundRobin => candidate_ids
+                .iter()
+                .position(|id| id == &source_id)
+                .map(|idx| (idx + 1) % len)
+                .unwrap_or(0),
+            Strategy::Priority => 0,
+        };
+
+        for step in 0..len {
+            let idx = (start_idx + step) % len;
+            let id = &candidate_ids[idx];
+            if id == &source_id {
+                continue;
             }
-        }
-        if runtime
-            .data
-            .lock()
-            .map_err(|_| "State unavailable")?
-            .revision
-            != revision
-        {
-            return Ok(false);
+            if let Ok(a) = refresh(runtime, &environment, id, force).await {
+                if account_remaining(&a, &config.monitored_model, now)
+                    .is_ok_and(|p| p >= config.candidate_min_percentage as f64)
+                {
+                    candidate = Some(a);
+                    break;
+                }
+            }
+            if runtime
+                .data
+                .lock()
+                .map_err(|_| "State unavailable")?
+                .revision
+                != revision
+            {
+                return Ok(false);
+            }
         }
     }
     let Some(candidate) = candidate else {
@@ -1665,4 +1689,45 @@ mod tests {
             );
         });
     }
+
+    #[test]
+    fn candidate_selection_strategies_round_robin_and_priority() {
+        let candidates = vec![
+            "A".to_string(),
+            "B".to_string(),
+            "C".to_string(),
+            "D".to_string(),
+        ];
+        let len = candidates.len();
+
+        let get_order = |strategy: Strategy, source: &str| -> Vec<String> {
+            let start_idx = match strategy {
+                Strategy::RoundRobin => candidates
+                    .iter()
+                    .position(|id| id == source)
+                    .map(|idx| (idx + 1) % len)
+                    .unwrap_or(0),
+                Strategy::Priority => 0,
+            };
+            (0..len)
+                .map(|step| (start_idx + step) % len)
+                .map(|idx| candidates[idx].clone())
+                .filter(|id| id != source)
+                .collect()
+        };
+
+        // Round-robin: advances in circular chain
+        assert_eq!(get_order(Strategy::RoundRobin, "A"), vec!["B", "C", "D"]);
+        assert_eq!(get_order(Strategy::RoundRobin, "B"), vec!["C", "D", "A"]);
+        assert_eq!(get_order(Strategy::RoundRobin, "C"), vec!["D", "A", "B"]);
+        assert_eq!(get_order(Strategy::RoundRobin, "D"), vec!["A", "B", "C"]);
+        assert_eq!(get_order(Strategy::RoundRobin, "X"), vec!["A", "B", "C", "D"]);
+
+        // Priority: always checks from index 0 in configured order
+        assert_eq!(get_order(Strategy::Priority, "A"), vec!["B", "C", "D"]);
+        assert_eq!(get_order(Strategy::Priority, "B"), vec!["A", "C", "D"]);
+        assert_eq!(get_order(Strategy::Priority, "C"), vec!["A", "B", "D"]);
+        assert_eq!(get_order(Strategy::Priority, "D"), vec!["A", "B", "C"]);
+    }
 }
+
